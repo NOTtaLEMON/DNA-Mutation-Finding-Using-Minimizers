@@ -9,20 +9,31 @@
  * ------------------------------------------------------------------------- */
 
 /* Converts one letter to its 2-bit code: A=0, C=1, G=2, T=3 (either case); -1 for anything else. */
-int base_to_code(char c)
+int base_to_code(char c) //made change here which was needed for step 2 code.
 {
-    (void)c;
-    /* TODO */
-    return -1;
+    switch (c) {
+    case 'A': case 'a': return 0;
+    case 'C': case 'c': return 1;
+    case 'G': case 'g': return 2;
+    case 'T': case 't': return 3;
+    default: return -1;
+    }
 }
 
 /* Returns the 2-bit code stored at position pos (byte pos / 4, top two bits first). */
+/* made change here. Retrieve one DNA base from the packed two-bit array. */
 uint8_t seq_get(const Seq *s, size_t pos)
 {
-    (void)s;
-    (void)pos;
-    /* TODO */
-    return 0;
+    size_t byte_index;
+    unsigned int shift;
+
+    if (s == NULL || s->cells == NULL || pos >= s->len)
+        return 0;
+
+    byte_index = pos / 4;
+    shift = (unsigned int)(6 - 2 * (pos % 4));
+
+    return (uint8_t)(((unsigned int)s->cells[byte_index] >> shift) & 0x03u);
 }
 
 /* ---------------------------------------------------------------------------
