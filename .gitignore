@@ -1,2 +1,7 @@
 .vibe-wise/
 material/
+/trace.exe
+/demo.exe
+/answer_key.txt
+/calls.txt
+__pycache__/

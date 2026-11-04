@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mutation Finder Steps</title>
+<style>
+:root {
+  --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --muted: #5d6677; --line: #dde1e8;
+  --accent: #3b5bdb; --soft: #eef1fb;
+  --A: #2b9a57; --C: #2f6fd6; --G: #d98a1f; --T: #d64545;
+  --tp: #2b9a57; --fn: #d64545; --fp: #e08a12; --mut: #8a3ffc; --err: #9aa3b2;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #12151b; --panel: #1b2029; --ink: #e7eaf0; --muted: #9aa3b2; --line: #2c3340;
+    --accent: #7c95ff; --soft: #232a3a;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+header { padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--panel);
+  display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
+header h1 { font-size: 18px; margin: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { background: var(--soft); border-radius: 999px; padding: 2px 10px; font-size: 13px; }
+.chip b { font-variant-numeric: tabular-nums; }
+.picker { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 13px; }
+select, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 10px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:disabled { opacity: .4; cursor: default; }
+.layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 66px); }
+nav { border-right: 1px solid var(--line); padding: 12px 8px; background: var(--panel); }
+nav button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px;
+  border-radius: 6px; margin-bottom: 2px; }
+nav button.on { background: var(--soft); color: var(--accent); font-weight: 600; }
+nav small { color: var(--muted); display: block; font-size: 12px; }
+main { padding: 20px 28px 80px; max-width: 1100px; min-width: 0; }
+h2 { margin: 0 0 4px; font-size: 22px; }
+.ds { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
+.explain { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+  border-radius: 8px; padding: 12px 16px; margin-bottom: 18px; }
+.explain p { margin: 4px 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
+  margin-bottom: 16px; overflow-x: auto; }
+.card h3 { margin: 0 0 10px; font-size: 15px; }
+.seq { font-family: ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1; }
+.row { display: flex; align-items: center; gap: 0; margin-bottom: 4px; }
+.row .lbl { width: 70px; color: var(--muted); font-size: 12px; font-family: system-ui, sans-serif; flex: none; }
+.b { width: 15px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-weight: 600; border-radius: 2px; margin-right: 1px; flex: none; }
+.b.A { background: var(--A); } .b.C { background: var(--C); } .b.G { background: var(--G); } .b.T { background: var(--T); }
+.b.mut { outline: 3px solid var(--mut); outline-offset: -1px; }
+.b.err { box-shadow: inset 0 -5px 0 rgba(0,0,0,.45); }
+.b.dim { opacity: .25; }
+.b.mis { outline: 2px solid var(--ink); outline-offset: -1px; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
+table { border-collapse: collapse; font-size: 13px; width: 100%; }
+th, td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; }
+td.mono, .mono { font-family: ui-monospace, Consolas, monospace; }
+.tag { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 12px; font-weight: 600; }
+.tag.ok { background: #d9f2e3; color: #17663a; } .tag.no { background: #fbe0e0; color: #9b2222; }
+.tag.mid { background: #fdebd0; color: #8a5300; } .tag.info { background: var(--soft); color: var(--accent); }
+.big { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
+.stat span { color: var(--muted); font-size: 12px; display: block; }
+.footer-nav { position: fixed; bottom: 0; left: 220px; right: 0; padding: 10px 28px; background: var(--panel);
+  border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
+.footer-nav .hint { color: var(--muted); font-size: 12px; }
+svg text { font-family: system-ui, sans-serif; }
+input[type=range] { width: 100%; }
+.err-box { background: #fbe0e0; color: #9b2222; padding: 16px; border-radius: 8px; white-space: pre-wrap; }
+.dp-small td { text-align: center; min-width: 26px; padding: 3px; font-family: ui-monospace, Consolas, monospace; }
+.dp-small td.inf { color: var(--muted); }
+.dp-small td.path { background: var(--soft); font-weight: 700; }
+@media (max-width: 760px) {
+  .layout { grid-template-columns: 1fr; } nav { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
+  nav button { width: auto; white-space: nowrap; } nav small { display: none; }
+  .footer-nav { left: 0; } main { padding: 16px; } .picker { margin-left: 0; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1>Minimizer Mutation Finder: one read, step by step</h1>
+  <div class="chips" id="chips"></div>
+  <div class="picker">
+    <label for="readSel">Read</label>
+    <select id="readSel"></select>
+  </div>
+</header>
+<div class="layout">
+  <nav id="nav"></nav>
+  <main id="main"><p>Running the C pipeline ...</p></main>
+</div>
+<div class="footer-nav">
+  <button id="prev">&larr; Previous</button>
+  <span class="hint">Use the arrow keys to step</span>
+  <button id="next">Next &rarr;</button>
+</div>
+<script>
+const STAGES = [
+  ["Load", "2-bit packed array"],
+  ["Minimizers", "Sliding window, monotonic queue"],
+  ["Index lookup", "Hash table with chaining"],
+  ["Bloom filter", "Bit array, 7 hash functions"],
+  ["Vote", "Binary search tree"],
+  ["Top 3", "Min-heap of size 3"],
+  ["Verify", "Banded edit-distance table"],
+  ["Pile-up", "Counting array + difference array"],
+  ["Score", "Sorted array + binary search"],
+];
+const L = "ACGT";
+let D = null, stage = 0, s7pos = null, s8sel = null;
+
+const $ = id => document.getElementById(id);
+const fmt = n => Number(n).toLocaleString("en-US");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+
+/* Loads the trace for one read from the local server and redraws everything. */
+async function load(read) {
+  $("main").innerHTML = "<p>Running the C pipeline ...</p>";
+  try {
+    const r = await fetch("/api/trace?read=" + read);
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    D = data; s7pos = null; s8sel = null;
+    drawHeader(); drawNav(); draw();
+  } catch (e) {
+    $("main").innerHTML = `<div class="err-box">Could not load the trace.\n\n${esc(e.message)}\n\nStart the server with: python web/server.py</div>`;
+  }
+}
+
+/* Header chips and the read picker. */
+function drawHeader() {
+  const s = D.summary, st = D.settings;
+  $("chips").innerHTML = [
+    `Reference <b>${fmt(s.ref_len)}</b> letters`,
+    `<b>${st.mutations}</b> planted, <b>${st.coverage}x</b>, <b>${(st.error_rate*100).toFixed(1)}%</b> errors, seed ${st.seed}`,
+    `Reads placed <b>${fmt(s.placed)}</b> / ${fmt(s.reads)}`,
+    `TP <b>${s.tp}</b> FP <b>${s.fp}</b> FN <b>${s.fn}</b>`,
+  ].map(t => `<span class="chip">${t}</span>`).join("");
+  const sel = $("readSel"), cur = D.read.index, I = D.interesting;
+  const opt = (i, tag) => `<option value="${i}" ${i === cur ? "selected" : ""}>Read #${i}${tag}</option>`;
+  let h = `<optgroup label="Reads over a planted mutation">${I.covers_mutation.map(i => opt(i, "")).join("")}</optgroup>`;
+  h += `<optgroup label="Reads not placed">${I.not_placed.map(i => opt(i, " (not placed)")).join("")}</optgroup>`;
+  if (!I.covers_mutation.includes(cur) && !I.not_placed.includes(cur)) h = opt(cur, "") + h;
+  sel.innerHTML = h;
+}
+
+/* Left-hand list of stages. */
+function drawNav() {
+  $("nav").innerHTML = STAGES.map((s, i) =>
+    `<button class="${i === stage ? "on" : ""}" onclick="go(${i})">${i + 1}. ${s[0]}<small>${s[1]}</small></button>`).join("");
+}
+
+/* Moves to stage i and redraws. */
+function go(i) {
+  stage = Math.max(0, Math.min(STAGES.length - 1, i));
+  drawNav(); draw(); window.scrollTo(0, 0);
+}
+
+/* Draws the current stage's panel. */
+function draw() {
+  const f = [stage1, stage2, stage3, stage4, stage5, stage6, stage7, stage8, stage9][stage];
+  $("main").innerHTML = `<h2>Stage ${stage + 1}: ${STAGES[stage][0]}</h2><div class="ds">Data structure: ${STAGES[stage][1]}</div>` + f();
+  $("prev").disabled = stage === 0;
+  $("next").disabled = stage === STAGES.length - 1;
+  if (stage === 1) hookWindowSlider();
+}
+
+/* One coloured letter tile. extra = extra CSS classes. */
+const tile = (ch, extra = "", title = "") => `<span class="b ${ch} ${extra}" title="${title}">${ch}</span>`;
+
+/* Rows of letter tiles, `per` letters per row, with a classes(i) callback for markers. */
+function tiles(str, per, classes, offset = 0, label = null) {
+  let h = "";
+  for (let a = 0; a < str.length; a += per) {
+    h += `<div class="row"><span class="lbl">${label ? label : fmt(offset + a)}</span>`;
+    for (let i = a; i < Math.min(str.length, a + per); i++) h += tile(str[i], classes ? classes(i) : "", `offset ${i}`);
+    h += "</div>";
+  }
+  return `<div class="seq">${h}</div>`;
+}
+
+const legendLetters = `<i style="background:var(--A)"></i>A <i style="background:var(--C)"></i>C <i style="background:var(--G)"></i>G <i style="background:var(--T)"></i>T`;
+
+/* Stage 1: the read as letters, then as packed 2-bit codes. */
+function stage1() {
+  const r = D.read, mut = new Set(r.mutations), err = new Set(r.errors);
+  const bits = r.packed_bytes.map((b, i) => {
+    const four = r.letters.slice(i * 4, i * 4 + 4).split("");
+    const pairs = four.map(ch => L.indexOf(ch).toString(2).padStart(2, "0"));
+    return `<tr><td class="mono">${four.map(c => tile(c)).join("")}</td><td class="mono">${pairs.join(" ")}</td><td class="mono">${b}</td></tr>`;
+  }).join("");
+  const placed = r.placed_start >= 0 ? `placed by the pipeline at <b>${fmt(r.placed_start)}</b>` : `<b>not placed</b> by the pipeline`;
+  return `<div class="explain">
+    <p>Read <b>#${r.index}</b> is ${r.letters.length} letters cut from the sample genome at position <b>${fmt(r.true_start)}</b> (${placed}).
+    The sample differs from the reference at the planted mutations; the sequencer also made random errors.</p>
+    <p>This read covers <b>${r.mutations.length}</b> planted mutation(s) and has <b>${r.errors.length}</b> sequencing error(s).
+    Each letter is stored in 2 bits: A=00, C=01, G=10, T=11, four letters per byte.</p></div>
+    <div class="card"><h3>The read</h3>${tiles(r.letters, 50, i => (mut.has(i) ? "mut " : "") + (err.has(i) ? "err" : ""))}
+    <div class="legend"><span>${legendLetters}</span><span><i style="outline:3px solid var(--mut);outline-offset:-2px"></i>planted mutation</span><span><i style="background:#888;box-shadow:inset 0 -4px 0 rgba(0,0,0,.5)"></i>sequencing error</span></div></div>
+    <div class="card"><h3>First bytes of the packed array</h3><table><tr><th>4 letters</th><th>2-bit codes</th><th>byte value</th></tr>${bits}</table>
+    <p class="ds" style="margin:8px 0 0">The reference is packed the same way: ${fmt(D.summary.ref_len)} letters in ${fmt(Math.ceil(D.summary.ref_len / 4))} bytes, ${D.summary.ref_nruns} N runs.</p></div>`;
+}
+
+/* Hash as a 0..1 fraction from its first 8 hex digits (for bar heights). */
+const hfrac = h => parseInt(h.slice(0, 8), 16) / 4294967296;
+
+/* Stage 2: every k-mer's hash as a bar, kept minimizers highlighted, with a window slider. */
+function stage2() {
+  const s2 = D.stage2, k = D.settings.k, w = D.settings.w;
+  const kept = new Set(s2.minimizers);
+  return `<div class="explain">
+    <p>Every ${k}-letter word (k-mer) in the read gets a hash. A window slides over <b>${w}</b> consecutive k-mers and keeps the one with the
+    <b>smallest hash</b>. Neighbouring windows often pick the same k-mer, so only <b>${s2.minimizers.length}</b> of the <b>${s2.kmers.length}</b>
+    k-mers are kept. The reference was reduced the same way to <b>${fmt(D.summary.ref_minimizers)}</b> kept words.</p>
+    <p>Drag the slider to move the window. Shorter bar = smaller hash.</p></div>
+    <div class="card"><h3>Hash of each k-mer (by start offset in the read)</h3>
+    <div id="hashChart"></div>
+    <input type="range" id="win" min="0" max="${Math.max(0, s2.kmers.length - w)}" value="0">
+    <div id="winInfo" class="ds"></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>kept minimizer</span><span><i style="background:var(--line)"></i>not kept</span><span><i style="background:var(--fp)"></i>smallest in the current window</span></div></div>`;
+}
+
+/* Redraws the stage 2 bar chart for the window starting at k-mer index wi. */
+function drawHashChart(wi) {
+  const s2 = D.stage2, w = D.settings.w, n = s2.kmers.length, kept = new Set(s2.minimizers);
+  const bw = 6, H = 160, W = n * bw;
+  let min = wi;
+  for (let i = wi; i < Math.min(n, wi + w); i++) if (s2.kmers[i].hash < s2.kmers[min].hash) min = i;
+  let svg = `<svg width="${W}" height="${H + 20}" viewBox="0 0 ${W} ${H + 20}">`;
+  svg += `<rect x="${wi * bw}" y="0" width="${w * bw}" height="${H}" fill="var(--soft)"/>`;
+  s2.kmers.forEach((km, i) => {
+    const h = Math.max(2, hfrac(km.hash) * (H - 6));
+    const col = i === min ? "var(--fp)" : kept.has(km.pos) ? "var(--accent)" : "var(--line)";
+    svg += `<rect x="${i * bw + 1}" y="${H - h}" width="${bw - 2}" height="${h}" fill="${col}"><title>k-mer at ${km.pos}, hash ${km.hash}</title></rect>`;
+  });
+  for (let t = 0; t < n; t += 25) svg += `<text x="${t * bw}" y="${H + 14}" font-size="10" fill="var(--muted)">${t}</text>`;
+  $("hashChart").innerHTML = svg + "</svg>";
+  const p = s2.kmers[min].pos, word = D.read.letters.slice(p, p + D.settings.k);
+  $("winInfo").innerHTML = `Window of k-mers ${wi} to ${Math.min(n, wi + w) - 1}: smallest hash is the k-mer at offset <b>${p}</b> <span class="mono">${word}</span> (hash <span class="mono">${s2.kmers[min].hash}</span>) ${kept.has(p) ? '<span class="tag ok">kept</span>' : ""}`;
+}
+
+/* Connects the stage 2 slider after the panel is drawn. */
+function hookWindowSlider() {
+  const r = $("win");
+  r.oninput = () => drawHashChart(+r.value);
+  drawHashChart(0);
+}
+
+/* Returns the planted-mutation / error offsets that a word at pos covers. */
+function changedIn(pos) {
+  const k = D.settings.k, r = D.read, out = [];
+  r.mutations.forEach(m => { if (m >= pos && m < pos + k) out.push("mutation @" + m); });
+  r.errors.forEach(e => { if (e >= pos && e < pos + k) out.push("error @" + e); });
+  return out;
+}
+
+/* Stage 3: index lookups for the words that passed the Bloom filter. */
+function stage3() {
+  const s = D.summary, ws = D.words.filter(w => w.looked_up);
+  const rows = ws.map(w => `<tr><td>${w.pos}</td><td class="mono">${w.word}</td><td class="mono">${w.hash.slice(0, 8)}…</td>
+    <td>${fmt(w.bucket)}</td><td>${w.probes}</td><td>${w.ref_positions.length ? w.ref_positions.map(fmt).join(", ") : '<span class="tag mid">not in index</span>'}</td></tr>`).join("");
+  return `<div class="explain">
+    <p>Before any read is processed, the reference's ${fmt(s.ref_minimizers)} kept words were stored in a hash table with
+    <b>${fmt(s.nbuckets)}</b> buckets (${fmt(s.index_entries)} distinct words). Each bucket holds a linked list (a chain) of words; each word holds a
+    linked list of every reference position where it occurs.</p>
+    <p>For a read word: bucket = hash mod ${fmt(s.nbuckets)}, then walk the chain comparing hash and word until it matches.
+    <b>Probes</b> = how many chain entries were checked. Only the ${ws.length} words that passed the Bloom filter (stage 4) are looked up.</p></div>
+    <div class="card"><h3>Lookups for read #${D.read.index}</h3><table><tr><th>read offset</th><th>word</th><th>hash</th><th>bucket</th><th>probes</th><th>reference positions</th></tr>${rows}</table></div>`;
+}
+
+/* Stage 4: which read words the Bloom filter let through. */
+function stage4() {
+  const s = D.summary, ws = D.words, skipped = ws.filter(w => !w.bloom).length;
+  const rows = ws.map(w => {
+    const ch = changedIn(w.pos);
+    const res = w.bloom ? (w.ref_positions.length ? '<span class="tag ok">maybe → found</span>' : '<span class="tag mid">maybe → false positive</span>')
+                        : '<span class="tag no">definitely absent</span>';
+    return `<tr><td>${w.pos}</td><td class="mono">${w.word}</td><td>${res}</td><td>${ch.length ? ch.join(", ") : '<span class="ds">none</span>'}</td></tr>`;
+  }).join("");
+  return `<div class="explain">
+    <p>The Bloom filter is a bit array of <b>${fmt(s.bloom_bits)}</b> bits. Each reference word set <b>${s.bloom_hashes}</b> bits. To test a read word,
+    check its ${s.bloom_hashes} bits: if any is 0 the word is <b>definitely not</b> in the reference and the index lookup is skipped.
+    If all are 1 it is <b>maybe</b> there (about 1% of absent words slip through).</p>
+    <p>Here <b>${skipped}</b> of ${ws.length} words were skipped. Look at the last column: skipped words contain a planted mutation or a
+    sequencing error, so they are not reference words. Dropping a word is safe: the read is still placed by its other words.</p></div>
+    <div class="card"><h3>Bloom check for each kept word</h3><table><tr><th>read offset</th><th>word</th><th>Bloom result</th><th>changed letters inside the word</th></tr>${rows}</table></div>`;
+}
+
+/* Lays out a BST with in-order x positions and depth y positions; returns an SVG string. */
+function treeSvg(root, best) {
+  const nodes = [], edges = [];
+  let order = 0;
+  (function walk(n, d, parent) {
+    if (!n) return;
+    walk(n.left, d + 1, n);
+    n._x = order++; n._y = d; nodes.push(n);
+    if (parent) edges.push([parent, n]);
+    walk(n.right, d + 1, n);
+  })(root, 0, null);
+  if (!nodes.length) return '<p class="ds">No votes: every word was skipped or not found.</p>';
+  const dx = 90, dy = 70, W = Math.max(300, nodes.length * dx + 40), H = (Math.max(...nodes.map(n => n._y)) + 1) * dy + 20;
+  const X = n => 50 + n._x * dx, Y = n => 36 + n._y * dy;
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
+  edges.forEach(([a, b]) => { s += `<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="var(--muted)"/>`; });
+  nodes.forEach(n => {
+    const on = n.start === best;
+    s += `<rect x="${X(n) - 38}" y="${Y(n) - 22}" width="76" height="44" rx="8" fill="${on ? "var(--accent)" : "var(--panel)"}" stroke="${on ? "var(--accent)" : "var(--line)"}"/>`;
+    s += `<text x="${X(n)}" y="${Y(n) - 3}" text-anchor="middle" font-size="13" font-weight="700" fill="${on ? "#fff" : "var(--ink)"}">${fmt(n.start)}</text>`;
+    s += `<text x="${X(n)}" y="${Y(n) + 14}" text-anchor="middle" font-size="11" fill="${on ? "#fff" : "var(--muted)"}">${n.count} vote${n.count > 1 ? "s" : ""}</text>`;
+  });
+  return s + "</svg>";
+}
+
+/* Stage 5: every vote, and the BST they built. */
+function stage5() {
+  const ws = D.words.filter(w => w.votes.length), s5 = D.stage5;
+  const best = D.stage6.sorted.length ? D.stage6.sorted[0][0] : null;
+  const list = ws.map(w => `<tr><td>${w.pos}</td><td>${w.ref_positions.map(fmt).join(", ")}</td><td>${w.votes.map(v => `<b>${fmt(v)}</b>`).join(", ")}</td></tr>`).join("");
+  return `<div class="explain">
+    <p>Each found word votes for where the read would start: <b>start = reference position − read offset</b>.
+    If a word appears in several reference places, it votes for each. Votes are counted in a binary search tree keyed by start:
+    a smaller start goes left, a larger one right, an equal one just adds 1 to that node's count.</p>
+    <p>${ws.length} words cast votes, giving <b>${s5.nodes}</b> distinct start(s); tree height ${s5.height}.
+    ${best !== null ? `The most votes went to start <b>${fmt(best)}</b>.` : ""}</p></div>
+    <div class="card"><h3>Vote tree</h3>${treeSvg(s5.tree, best)}</div>
+    <div class="card"><h3>Votes</h3><table><tr><th>read offset</th><th>reference position(s)</th><th>vote for start</th></tr>${list}</table></div>`;
+}
+
+/* Small drawing of a 3-slot heap array as a tree (index 0 on top). */
+function heapSvg(heap) {
+  const pos = [[110, 26], [50, 86], [170, 86]];
+  let s = `<svg width="220" height="116" viewBox="0 0 220 116">`;
+  if (heap.length > 1) s += `<line x1="110" y1="26" x2="50" y2="86" stroke="var(--muted)"/>`;
+  if (heap.length > 2) s += `<line x1="110" y1="26" x2="170" y2="86" stroke="var(--muted)"/>`;
+  heap.forEach((c, i) => {
+    const [x, y] = pos[i];
+    s += `<rect x="${x - 40}" y="${y - 20}" width="80" height="40" rx="8" fill="var(--panel)" stroke="${i === 0 ? "var(--fp)" : "var(--line)"}" stroke-width="${i === 0 ? 2 : 1}"/>`;
+    s += `<text x="${x}" y="${y - 2}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">${fmt(c[0])}</text>`;
+    s += `<text x="${x}" y="${y + 13}" text-anchor="middle" font-size="10" fill="var(--muted)">[${i}] ${c[1]} votes</text>`;
+  });
+  return s + "</svg>";
+}
+
+/* Stage 6: each tree node offered to the size-3 min-heap, in walk order. */
+function stage6() {
+  const s6 = D.stage6;
+  const act = { insert: '<span class="tag info">insert + sift up</span>', replace: '<span class="tag ok">beats root → replace + sift down</span>', discard: '<span class="tag no">not better than root → discard</span>' };
+  const steps = s6.offers.map((o, i) => `<div class="card" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+    <div style="min-width:240px"><b>Offer ${i + 1}:</b> start ${fmt(o.start)} with ${o.votes} vote(s)<br>${act[o.action]}
+    ${o.root_before ? `<div class="ds">root before: ${fmt(o.root_before[0])} (${o.root_before[1]} votes)</div>` : ""}</div>${heapSvg(o.heap)}</div>`).join("");
+  return `<div class="explain">
+    <p>An in-order walk of the vote tree offers every (start, votes) pair to a min-heap that holds at most <b>3</b>. The <b>weakest</b> kept
+    candidate sits at the root [0] (fewer votes is weaker; on a tie, the larger start is weaker).</p>
+    <p>While fewer than 3 are kept, a new one is inserted and sifted up. Once full, a newcomer only has to beat the root: if it does, it
+    replaces the root and sifts down; otherwise it is discarded. Here ${s6.offers.length} candidate(s) were offered.</p></div>
+    ${steps || '<p class="ds">No candidates: this read got no votes.</p>'}
+    <div class="card"><h3>Short-list handed to stage 7 (best first)</h3>${s6.sorted.length ? s6.sorted.map((c, i) => `<span class="chip" style="margin-right:6px">${i + 1}. start <b>${fmt(c[0])}</b>, ${c[1]} votes</span>`).join("") : "empty"}</div>`;
+}
+
+/* Builds a small table of the first rows of the DP band (around the diagonal). */
+function dpSmall(dp, read, win, band, rows) {
+  const cols = Math.min(win.length, rows + band);
+  let h = `<table class="dp-small"><tr><td></td><td></td>${win.slice(0, cols).split("").map(c => `<td>${tile(c)}</td>`).join("")}</tr>`;
+  for (let i = 0; i <= rows; i++) {
+    h += `<tr><td>${i ? tile(read[i - 1]) : ""}</td>`;
+    for (let j = 0; j <= cols; j++) {
+      const d = j - i + band, v = d >= 0 && d < 2 * band + 1 ? dp[i][d] : null;
+      h += v === null ? `<td class="inf">${Math.abs(i - j) <= band ? "∞" : ""}</td>` : `<td class="${i === j ? "path" : ""}">${v}</td>`;
+    }
+    h += "</tr>";
+  }
+  return h + "</table>";
+}
+
+/* Heatmap of the whole band: one small square per computed cell. */
+function dpHeat(dp, band, winLen) {
+  const n = dp.length, c = 3, W = (winLen + 1) * c, H = n * c;
+  let max = 1;
+  dp.forEach(r => r.forEach(v => { if (v !== null && v > max) max = v; }));
+  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="var(--soft)"/>`;
+  dp.forEach((r, i) => r.forEach((v, d) => {
+    const j = i - band + d;
+    if (v === null || j < 0 || j > winLen) return;
+    const t = Math.min(1, v / Math.max(3, max));
+    s += `<rect x="${j * c}" y="${i * c}" width="${c}" height="${c}" fill="hsl(${130 - 130 * t},65%,${48 - 10 * t}%)"/>`;
+  }));
+  return s + "</svg>";
+}
+
+/* Stage 7: for each candidate, the letter-by-letter comparison and its DP band. */
+function stage7() {
+  const s7 = D.stage7, r = D.read, band = D.settings.band;
+  const cards = s7.candidates.map((c, ci) => {
+    const verdict = c.accepted ? '<span class="tag ok">accepted</span>' : '<span class="tag no">rejected</span>';
+    let body = `<div class="ds">votes ${c.votes} · status ${esc(c.status)} · edit distance <b>${c.distance === null ? "∞" : c.distance}</b> (limit ${D.settings.max_edit})</div>`;
+    if (c.window) {
+      body += `<h3 style="margin-top:12px">Read vs reference window</h3>`;
+      const win = c.window;
+      for (let a = 0; a < r.letters.length; a += 50) {
+        const rr = r.letters.slice(a, a + 50), ww = win.slice(a, a + 50);
+        body += `<div class="seq"><div class="row"><span class="lbl">read ${a}</span>${rr.split("").map((ch, i) => tile(ch, ch !== ww[i] ? "mis" : "dim")).join("")}</div>`;
+        body += `<div class="row" style="margin-bottom:10px"><span class="lbl">ref ${fmt(c.start + a)}</span>${ww.split("").map((ch, i) => tile(ch, ch !== rr[i] ? "mis" : "dim")).join("")}</div></div>`;
+      }
+    }
+    if (c.dp) {
+      body += `<h3 style="margin-top:12px">Edit-distance table: first rows</h3><div class="ds">Each cell = fewest edits between the first i read letters and first j window letters. Only cells within ${band} of the diagonal are computed (∞ = outside reach).</div>`;
+      body += dpSmall(c.dp, r.letters, c.window, band, 12);
+      body += `<h3 style="margin-top:12px">Whole band (${r.letters.length + 1} rows)</h3><div class="ds">Green = few edits, red = many. Bottom-right cell = the answer, ${c.distance}.</div>${dpHeat(c.dp, band, c.window.length)}`;
+    }
+    return `<div class="card"><h3>Candidate ${ci + 1}: start ${fmt(c.start)} ${verdict}</h3>${body}</div>`;
+  }).join("");
+  return `<div class="explain">
+    <p>Votes only show that some words matched. Stage 7 checks <b>every letter</b>: it compares the read with the reference window that starts at
+    each candidate, counting the fewest substitutions, insertions and deletions needed (edit distance). A candidate is accepted if the distance is at
+    most <b>${D.settings.max_edit}</b>; among accepted ones the smallest distance wins.</p>
+    <p>Result: ${s7.mapped ? `read placed at <b>${fmt(s7.start)}</b>${s7.start === r.true_start ? " (its true start)" : ` (true start ${fmt(r.true_start)})`}.` :
+      `<b>not placed</b>: no candidate was within ${D.settings.max_edit} edits, so this read is left out of the pile-up.`}
+    Mismatched letters are outlined below; this read has ${r.mutations.length} planted mutation(s) and ${r.errors.length} error(s).</p></div>${cards || '<p class="ds">No candidates to verify.</p>'}`;
+}
+
+/* Stage 8: depth and letter counts under this read, with one position's call decision. */
+function stage8() {
+  const s8 = D.stage8, n = s8.depth.length, st = D.settings;
+  const calls = new Set(s8.calls);
+  if (s8sel === null) s8sel = s8.calls.length ? s8.calls[0] : (D.read.mutations[0] ?? 0);
+  const maxD = Math.max(1, ...s8.depth), bw = 6, H = 150, W = n * bw;
+  let svg = `<svg width="${W}" height="${H + 24}" viewBox="0 0 ${W} ${H + 24}">`;
+  s8.depth.forEach((dep, i) => {
+    const ref = L.indexOf(s8.ref_letters[i]), cnt = s8.counts[i];
+    let y = H;
+    const hRef = cnt[ref] / maxD * H;
+    svg += `<rect x="${i * bw + .5}" y="${y - hRef}" width="${bw - 1}" height="${hRef}" fill="var(--line)" onclick="pick8(${i})" style="cursor:pointer"/>`;
+    y -= hRef;
+    [0, 1, 2, 3].forEach(c => {
+      if (c === ref || !cnt[c]) return;
+      const h = cnt[c] / maxD * H;
+      svg += `<rect x="${i * bw + .5}" y="${y - h}" width="${bw - 1}" height="${h}" fill="var(--${L[c]})" onclick="pick8(${i})" style="cursor:pointer"/>`;
+      y -= h;
+    });
+    if (calls.has(i)) svg += `<text x="${i * bw + bw / 2}" y="${H + 14}" text-anchor="middle" font-size="12" fill="var(--tp)">▲</text>`;
+    if (i === s8sel) svg += `<rect x="${i * bw}" y="0" width="${bw}" height="${H}" fill="none" stroke="var(--ink)" stroke-width="1.5"/>`;
+  });
+  svg += "</svg>";
+
+  const i = s8sel, cnt = s8.counts[i], dep = s8.depth[i], ref = L.indexOf(s8.ref_letters[i]);
+  let alt = -1;
+  [0, 1, 2, 3].forEach(c => { if (c !== ref && (alt < 0 || cnt[c] > cnt[alt])) alt = c; });
+  const altN = alt >= 0 ? cnt[alt] : 0;
+  const okDepth = dep >= st.min_depth, okFrac = altN > 0 && altN * 100 >= st.min_alt_pct * dep;
+  const bars = [0, 1, 2, 3].map(c => `<div class="row"><span class="lbl">${L[c]}${c === ref ? " (ref)" : ""}</span>
+    <span style="display:inline-block;height:16px;width:${cnt[c] / Math.max(1, dep) * 260}px;background:var(--${L[c]});border-radius:2px"></span>&nbsp;${cnt[c]}</div>`).join("");
+  return `<div class="explain">
+    <p>After all reads are placed, every accepted read adds 1 to the counter of its letter at each position it covers. Depth (reads covering a position)
+    comes from a difference array: +1 at a read's start, −1 just past its end, then a running sum.</p>
+    <p><b>Mutation or sequencing error?</b> A mutation is in the sample genome, so almost every read covering that spot shows it. An error is random in
+    one read. Rule: call a mutation when depth ≥ <b>${st.min_depth}</b> and at least <b>${st.min_alt_pct}%</b> of the reads show the same non-reference letter.
+    Click any bar to inspect that position.</p></div>
+    <div class="card"><h3>Positions ${fmt(s8.span_start)}–${fmt(s8.span_start + n - 1)} (under read #${D.read.index})</h3>${svg}
+    <div class="legend"><span><i style="background:var(--line)"></i>reads matching the reference</span><span>${legendLetters} (other letters)</span><span style="color:var(--tp)">▲ mutation called</span></div></div>
+    <div class="card"><h3>Position ${fmt(s8.span_start + i)} (1-based ${fmt(s8.span_start + i + 1)}): reference ${s8.ref_letters[i]}</h3>${bars}
+    <p>Depth <b>${dep}</b> ${okDepth ? "≥" : "<"} ${st.min_depth} ${okDepth ? "✓" : "✗"} · most common other letter <b>${alt >= 0 && altN ? L[alt] : "none"}</b> with ${altN} read(s):
+    ${altN} × 100 = ${altN * 100} ${okFrac ? "≥" : "<"} ${st.min_alt_pct} × ${dep} = ${st.min_alt_pct * dep} ${okFrac ? "✓" : "✗"}</p>
+    <p>${okDepth && okFrac ? `<span class="tag ok">mutation called: ${s8.ref_letters[i]} → ${L[alt]}</span>` :
+      altN ? '<span class="tag mid">treated as sequencing error(s): no call</span>' : '<span class="tag info">all reads agree with the reference</span>'}</p></div>`;
+}
+
+/* Selects a stage 8 position and redraws. */
+function pick8(i) { s8sel = i; draw(); }
+
+/* Stage 9: genome-wide picture of the key and the calls, then the score. */
+function stage9() {
+  const s9 = D.stage9, s = D.summary, len = s.ref_len, W = 1000, H = 120;
+  const called = new Map(s9.calls.map(c => [c.pos, c]));
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px">`;
+  const maxD = Math.max(1, ...s9.depth_sample);
+  let path = "";
+  s9.depth_sample.forEach((d, i) => { path += `${i ? "L" : "M"}${(i * 100 / len * W).toFixed(1)},${(80 - d / maxD * 50).toFixed(1)}`; });
+  svg += `<path d="${path}" fill="none" stroke="var(--muted)" stroke-width="1"/><text x="0" y="22" font-size="11" fill="var(--muted)">read depth (max ${maxD})</text>`;
+  svg += `<rect x="0" y="88" width="${W}" height="10" rx="3" fill="var(--line)"/>`;
+  s9.key.forEach(k => {
+    const c = called.get(k.pos), ok = c && c.tp;
+    svg += `<line x1="${k.pos / len * W}" y1="84" x2="${k.pos / len * W}" y2="102" stroke="var(${ok ? "--tp" : "--fn"})" stroke-width="3"><title>${k.pos + 1}: ${k.ref}→${k.alt}, depth ${k.depth} ${ok ? "found" : "missed"}</title></line>`;
+  });
+  s9.calls.filter(c => !c.tp).forEach(c => { svg += `<line x1="${c.pos / len * W}" y1="84" x2="${c.pos / len * W}" y2="102" stroke="var(--fp)" stroke-width="3"/>`; });
+  svg += `<text x="0" y="116" font-size="11" fill="var(--muted)">1</text><text x="${W}" y="116" font-size="11" text-anchor="end" fill="var(--muted)">${fmt(len)}</text></svg>`;
+  const rows = s9.key.map(k => {
+    const c = called.get(k.pos), ok = c && c.tp;
+    return `<tr><td>${fmt(k.pos + 1)}</td><td class="mono">${k.ref} → ${k.alt}</td><td>${k.depth}</td><td>${c ? `${c.alt_count} / ${c.depth}` : "–"}</td><td>${ok ? '<span class="tag ok">TP</span>' : '<span class="tag no">FN</span>'}</td></tr>`;
+  }).join("") + s9.calls.filter(c => !c.tp).map(c => `<tr><td>${fmt(c.pos + 1)}</td><td class="mono">${c.ref} → ${c.alt}</td><td>${c.depth}</td><td>${c.alt_count} / ${c.depth}</td><td><span class="tag mid">FP</span></td></tr>`).join("");
+  return `<div class="explain">
+    <p>The planted answer key is sorted by position. For each call, a <b>binary search</b> finds that position in the key (about ${Math.ceil(Math.log2(s9.key.length + 1))}
+    steps for ${s9.key.length} entries). A call is a <b>true positive</b> only if the position and the new letter both match.</p>
+    <p>Recall is shown two ways: against every planted mutation, and against <b>callable</b> ones (at least ${D.settings.min_depth} reads covering them).
+    A mutation no read covers is not the pipeline's fault.</p></div>
+    <div class="stats">
+      <div class="stat"><span>True positives</span><div class="big" style="color:var(--tp)">${s.tp}</div></div>
+      <div class="stat"><span>False positives</span><div class="big" style="color:var(--fp)">${s.fp}</div></div>
+      <div class="stat"><span>Missed (FN)</span><div class="big" style="color:var(--fn)">${s.fn}</div></div>
+      <div class="stat"><span>Precision</span><div class="big">${s.precision}%</div></div>
+      <div class="stat"><span>Recall (all / callable)</span><div class="big">${s.recall_all}% / ${s.recall_callable}%</div></div>
+      <div class="stat"><span>Reads placed / wrong start</span><div class="big">${fmt(s.placed)} / ${s.misplaced}</div></div>
+    </div>
+    <div class="card"><h3>Whole genome</h3>${svg}<div class="legend"><span><i style="background:var(--tp)"></i>planted, found</span><span><i style="background:var(--fn)"></i>planted, missed</span><span><i style="background:var(--fp)"></i>false call</span></div></div>
+    <div class="card"><h3>Answer key vs calls (1-based positions)</h3><table><tr><th>position</th><th>change</th><th>depth</th><th>reads with alt</th><th>result</th></tr>${rows}</table></div>`;
+}
+
+$("prev").onclick = () => go(stage - 1);
+$("next").onclick = () => go(stage + 1);
+$("readSel").onchange = e => load(+e.target.value);
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+  if (e.key === "ArrowRight") go(stage + 1);
+  if (e.key === "ArrowLeft") go(stage - 1);
+});
+load(-1);
+</script>
+</body>
+</html>
