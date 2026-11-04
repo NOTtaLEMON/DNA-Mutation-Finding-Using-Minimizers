@@ -4,8 +4,9 @@ Local server for the step-by-step visualizer.
 Run from anywhere:   python web/server.py      then open http://localhost:8000
 
 GET /                  serves web/index.html
-GET /api/trace?read=N  runs the C trace program for read N (-1 = auto pick)
-                       and returns its JSON
+GET /api/trace?read=N&mutations=..&coverage=..&error_rate=..&seed=..&min_depth=..&max_edit=..
+                       runs the C trace program for read N (-1 = auto pick) with
+                       those settings (each optional, range-checked) and returns its JSON
 
 The C program (trace.exe) is built with gcc the first time, and again
 whenever a .c or .h file under src/ is newer than it. Python standard
@@ -22,11 +23,21 @@ import urllib.parse
 WEB_DIR = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(WEB_DIR)
 EXE = os.path.join(ROOT, "trace.exe" if os.name == "nt" else "trace")
-PORT = 8000
+PORT = int(os.environ.get("PORT", "8000"))   # set PORT to use another port
 
 STAGE_DIRS = ["stage1_load", "stage2_minimizers", "stage3_index", "stage4_bloom",
               "stage5_vote", "stage6_top3", "stage7_verify", "stage8_pileup",
               "stage9_score", "simulate"]
+# Settings the page may change: name -> (type, default, lowest, highest), in trace.c's argument order.
+SETTINGS = [
+    ("mutations", int, 20, 1, 500),
+    ("coverage", float, 30.0, 1.0, 100.0),
+    ("error_rate", float, 0.01, 0.0, 0.10),
+    ("seed", int, 42, 0, 1_000_000_000),
+    ("min_depth", int, 3, 1, 50),
+    ("max_edit", int, 3, 0, 10),
+]
+
 SOURCES = ["stage1_load/seq.c", "stage2_minimizers/minimizer.c", "stage3_index/index.c",
            "stage4_bloom/bloom.c", "stage5_vote/vote.c", "stage6_top3/top3.c",
            "stage7_verify/verify.c", "stage8_pileup/pileup.c", "stage9_score/score.c",
@@ -77,11 +88,22 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         except ValueError:
             return self.send_json(400, {"error": "read must be a whole number"})
 
+        args = []
+        for name, kind, default, low, high in SETTINGS:
+            raw = query.get(name, [str(default)])[0]
+            try:
+                value = kind(raw)
+            except ValueError:
+                return self.send_json(400, {"error": f"{name} must be a number"})
+            if not low <= value <= high:
+                return self.send_json(400, {"error": f"{name} must be between {low} and {high}"})
+            args.append(str(value))
+
         error = build_if_needed()
         if error:
             return self.send_json(500, {"error": error})
 
-        result = subprocess.run([EXE, os.path.join(ROOT, "sequence.fasta"), str(read)],
+        result = subprocess.run([EXE, os.path.join(ROOT, "sequence.fasta"), str(read)] + args,
                                 capture_output=True, text=True, cwd=ROOT)
         if result.returncode != 0:
             return self.send_json(500, {"error": result.stdout or result.stderr})

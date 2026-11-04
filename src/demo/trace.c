@@ -2,10 +2,11 @@
  * Trace of one read through all 9 stages, printed as JSON for the web
  * visualizer (web/index.html, served by web/server.py).
  *
- * Usage: trace [reference.fasta] [read_index]
+ * Usage: trace [reference.fasta] [read_index] [mutations] [coverage]
+ *              [error_rate] [seed] [min_depth] [max_edit]
  * read_index -1 (the default) picks the first placed read that covers a
- * planted mutation. Settings are the demo defaults (20 mutations, 30x,
- * 1% errors, seed 42), so the trace matches what demo.exe prints.
+ * planted mutation. Defaults: 20 mutations, 30x, 1% errors, seed 42,
+ * min depth 3, edit limit 3, so with no settings the trace matches demo.exe.
  *
  * The pipeline runs over every read exactly as in demo.c. For the chosen read
  * the stage 4/5 loop and the stage 6 offers are repeated step by step so each
@@ -28,11 +29,17 @@ static const char LETTER[] = "ACGT";
 #define W 10
 #define READ_LEN 150
 #define BLOOM_FP 0.01
-#define MUTATIONS 20
-#define COVERAGE 30.0
-#define ERROR_RATE 0.01
-#define SEED 42
 #define DP_SHOW_INF ((size_t)-1)
+
+/* Settings that the visualizer can change; everything else is fixed above. */
+typedef struct {
+    size_t mutations;
+    double coverage;
+    double error_rate;
+    unsigned long seed;
+    uint32_t min_depth;
+    size_t max_edit;
+} TraceSettings;
 
 /* Prints a 64-bit hash as 16 hex digits in two halves (old MinGW printf has no %llx). */
 static void print_hash(uint64_t h)
@@ -51,9 +58,9 @@ static void print_letters(const Seq *s, size_t from, size_t len)
     putchar('"');
 }
 
-/* Stages 2 to 7 for one read, as in demo.c. Returns the accepted start, or -1. */
+/* Stages 2 to 7 for one read, as in demo.c, with edit limit max_edit. Returns the accepted start, or -1. */
 static long place_read(const Seq *ref, const Seq *read, const Index *idx,
-                       const BloomFilter *bloom)
+                       const BloomFilter *bloom, size_t max_edit)
 {
     MinimizerSet mins = {0};
     VoteTree tree = {0};
@@ -67,8 +74,7 @@ static long place_read(const Seq *ref, const Seq *read, const Index *idx,
         vote_read(read, &mins, idx, bloom, K, &tree, NULL) == 0 &&
         top3_from_vote_tree(&tree, &top) == 0 &&
         top3_get_sorted(&top, sorted, &n) == 0 &&
-        verify_candidates(ref, read, sorted, n, VERIFY_DEFAULT_BAND,
-                          VERIFY_DEFAULT_MAX_EDIT_DISTANCE, &vr) == 0 &&
+        verify_candidates(ref, read, sorted, n, VERIFY_DEFAULT_BAND, max_edit, &vr) == 0 &&
         vr.mapped)
         placed = vr.start;
 
@@ -232,6 +238,7 @@ int main(int argc, char **argv)
 {
     const char *path = argc > 1 ? argv[1] : "sequence.fasta";
     long want = argc > 2 ? strtol(argv[2], NULL, 10) : -1;
+    TraceSettings set;
     Seq ref = {0}, sample = {0};
     MinimizerSet ref_mins = {0};
     Index idx = {0};
@@ -247,14 +254,21 @@ int main(int argc, char **argv)
     size_t i, placed = 0, misplaced = 0, chosen;
     int rc = 1;
 
+    set.mutations = argc > 3 ? (size_t)strtoul(argv[3], NULL, 10) : 20;
+    set.coverage = argc > 4 ? atof(argv[4]) : 30.0;
+    set.error_rate = argc > 5 ? atof(argv[5]) : 0.01;
+    set.seed = argc > 6 ? strtoul(argv[6], NULL, 10) : 42;
+    set.min_depth = argc > 7 ? (uint32_t)strtoul(argv[7], NULL, 10) : PILEUP_DEFAULT_MIN_DEPTH;
+    set.max_edit = argc > 8 ? (size_t)strtoul(argv[8], NULL, 10) : VERIFY_DEFAULT_MAX_EDIT_DISTANCE;
+
     if (seq_load_fasta(path, &ref) != 0) {
         printf("{\"error\":\"could not load %s\"}\n", path);
         return 1;
     }
-    sim_rng_seed(&rng, SEED);
-    if (sim_plant(&ref, MUTATIONS, &rng, &key) != 0 ||
+    sim_rng_seed(&rng, set.seed);
+    if (sim_plant(&ref, set.mutations, &rng, &key) != 0 ||
         sim_make_sample(&ref, &key, &sample) != 0 ||
-        sim_reads(&sample, READ_LEN, COVERAGE, ERROR_RATE, &rng, &reads) != 0 ||
+        sim_reads(&sample, READ_LEN, set.coverage, set.error_rate, &rng, &reads) != 0 ||
         minimizers_generate(&ref, K, W, &ref_mins) != 0 ||
         index_build(&ref, &ref_mins, K, 0, &idx) != 0 ||
         bloom_build_from_minimizers(&ref, &ref_mins, K, BLOOM_FP, &bloom) != 0 ||
@@ -269,7 +283,7 @@ int main(int argc, char **argv)
     if (placed_at == NULL || depth == NULL)
         goto done;
     for (i = 0; i < reads.count; i++) {
-        placed_at[i] = place_read(&ref, &reads.reads[i], &idx, &bloom);
+        placed_at[i] = place_read(&ref, &reads.reads[i], &idx, &bloom, set.max_edit);
         if (placed_at[i] < 0)
             continue;
         placed++;
@@ -278,8 +292,8 @@ int main(int argc, char **argv)
         pileup_add_read(&pile, &reads.reads[i], (size_t)placed_at[i]);
     }
     if (pileup_depths(&pile, depth) != 0 ||
-        pileup_call(&pile, &ref, PILEUP_DEFAULT_MIN_DEPTH, PILEUP_DEFAULT_MIN_ALT_PERCENT, &calls) != 0 ||
-        score_calls(&calls, &key, depth, ref.len, PILEUP_DEFAULT_MIN_DEPTH, &sc) != 0)
+        pileup_call(&pile, &ref, set.min_depth, PILEUP_DEFAULT_MIN_ALT_PERCENT, &calls) != 0 ||
+        score_calls(&calls, &key, depth, ref.len, set.min_depth, &sc) != 0)
         goto done;
 
     /* Pick the read: as asked, or the first placed read that covers a mutation. */
@@ -294,12 +308,12 @@ int main(int argc, char **argv)
             }
     }
 
-    printf("{\"settings\":{\"k\":%d,\"w\":%d,\"read_len\":%d,\"mutations\":%d,\"coverage\":%.0f,"
-           "\"error_rate\":%.3f,\"seed\":%d,\"band\":%lu,\"max_edit\":%lu,\"min_depth\":%lu,"
+    printf("{\"settings\":{\"k\":%d,\"w\":%d,\"read_len\":%d,\"mutations\":%lu,\"coverage\":%g,"
+           "\"error_rate\":%g,\"seed\":%lu,\"band\":%lu,\"max_edit\":%lu,\"min_depth\":%lu,"
            "\"min_alt_pct\":%lu,\"bloom_fp\":%.2f},\n",
-           K, W, READ_LEN, MUTATIONS, COVERAGE, ERROR_RATE, SEED,
-           (unsigned long)VERIFY_DEFAULT_BAND, (unsigned long)VERIFY_DEFAULT_MAX_EDIT_DISTANCE,
-           (unsigned long)PILEUP_DEFAULT_MIN_DEPTH, (unsigned long)PILEUP_DEFAULT_MIN_ALT_PERCENT,
+           K, W, READ_LEN, (unsigned long)set.mutations, set.coverage, set.error_rate, set.seed,
+           (unsigned long)VERIFY_DEFAULT_BAND, (unsigned long)set.max_edit,
+           (unsigned long)set.min_depth, (unsigned long)PILEUP_DEFAULT_MIN_ALT_PERCENT,
            BLOOM_FP);
     printf("\"summary\":{\"ref_len\":%lu,\"ref_nruns\":%lu,\"reads\":%lu,\"placed\":%lu,"
            "\"unplaced\":%lu,\"misplaced\":%lu,\"ref_minimizers\":%lu,\"index_entries\":%lu,"
@@ -430,8 +444,7 @@ int main(int argc, char **argv)
         printf("]},\n");
 
         /* Stage 7: verify.c's decision, plus the band of the table for each candidate. */
-        verify_candidates(&ref, rd, sorted, n, VERIFY_DEFAULT_BAND,
-                          VERIFY_DEFAULT_MAX_EDIT_DISTANCE, &vr);
+        verify_candidates(&ref, rd, sorted, n, VERIFY_DEFAULT_BAND, set.max_edit, &vr);
         printf("\"stage7\":{\"mapped\":%d,\"start\":%ld,\"candidates\":[", vr.mapped,
                vr.mapped ? vr.start : -1L);
         for (c = 0; c < vr.candidate_count; c++) {

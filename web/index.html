@@ -31,6 +31,14 @@ select, button { font: inherit; color: var(--ink); background: var(--panel); bor
   border-radius: 6px; padding: 4px 10px; cursor: pointer; }
 button:hover { border-color: var(--accent); }
 button:disabled { opacity: .4; cursor: default; }
+.settings { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; padding: 10px 24px;
+  background: var(--panel); border-bottom: 1px solid var(--line); font-size: 13px; }
+.settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.settings input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+  border-radius: 6px; padding: 4px 8px; width: 110px; }
+.settings .run { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
+.settings .status { color: var(--muted); }
+.settings .presets { display: flex; gap: 6px; align-items: center; }
 .layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 66px); }
 nav { border-right: 1px solid var(--line); padding: 12px 8px; background: var(--panel); }
 nav button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px;
@@ -94,6 +102,17 @@ input[type=range] { width: 100%; }
     <select id="readSel"></select>
   </div>
 </header>
+<form class="settings" id="settings" onsubmit="event.preventDefault(); load(-1);">
+  <span id="settingInputs" style="display:contents"></span>
+  <button type="submit" class="run">Run pipeline</button>
+  <span class="presets">Try:
+    <button type="button" onclick="preset('default')">Default</button>
+    <button type="button" onclick="preset('hard')">Low coverage, 2% errors</button>
+    <button type="button" onclick="preset('loose')">2% errors, edit limit 6</button>
+    <button type="button" onclick="preset('depth1')">Min depth 1, 3x</button>
+  </span>
+  <span class="status" id="status"></span>
+</form>
 <div class="layout">
   <nav id="nav"></nav>
   <main id="main"><p>Running the C pipeline ...</p></main>
@@ -122,17 +141,59 @@ const $ = id => document.getElementById(id);
 const fmt = n => Number(n).toLocaleString("en-US");
 const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 
-/* Loads the trace for one read from the local server and redraws everything. */
+/* Settings the C pipeline accepts: [name, label, default, min, max, step]. Ranges match web/server.py. */
+const SETTINGS = [
+  ["mutations", "Planted mutations", 20, 1, 500, 1],
+  ["coverage", "Coverage (x)", 30, 1, 100, 1],
+  ["error_rate", "Sequencing errors (%)", 1, 0, 10, 0.1],
+  ["seed", "Random seed", 42, 0, 1000000000, 1],
+  ["min_depth", "Min depth (stage 8)", 3, 1, 50, 1],
+  ["max_edit", "Edit limit (stage 7)", 3, 0, 10, 1],
+];
+const PRESETS = {
+  default: { mutations: 20, coverage: 30, error_rate: 1, seed: 42, min_depth: 3, max_edit: 3 },
+  hard: { mutations: 50, coverage: 10, error_rate: 2, seed: 7, min_depth: 3, max_edit: 3 },
+  loose: { mutations: 20, coverage: 30, error_rate: 2, seed: 42, min_depth: 3, max_edit: 6 },
+  depth1: { mutations: 20, coverage: 3, error_rate: 1, seed: 42, min_depth: 1, max_edit: 3 },
+};
+
+/* Draws one number box per setting. */
+function drawSettings() {
+  $("settingInputs").innerHTML = SETTINGS.map(([name, label, def, min, max, step]) =>
+    `<label>${label}<input type="number" id="set_${name}" value="${def}" min="${min}" max="${max}" step="${step}" required></label>`).join("");
+}
+
+/* Fills the boxes from a preset and runs the pipeline. */
+function preset(name) {
+  Object.entries(PRESETS[name]).forEach(([k, v]) => { $("set_" + k).value = v; });
+  load(-1);
+}
+
+/* Current settings as a query string (error rate is typed in percent, sent as a fraction). */
+function settingsQuery() {
+  return SETTINGS.map(([name]) => {
+    let v = Number($("set_" + name).value);
+    if (name === "error_rate") v = v / 100;
+    return `&${name}=${encodeURIComponent(v)}`;
+  }).join("");
+}
+
+/* Runs the C pipeline on the local server for one read with the current settings, then redraws. */
 async function load(read) {
+  if (!$("settings").reportValidity()) return;
   $("main").innerHTML = "<p>Running the C pipeline ...</p>";
+  $("status").textContent = "running ...";
+  const t0 = performance.now();
   try {
-    const r = await fetch("/api/trace?read=" + read);
+    const r = await fetch("/api/trace?read=" + read + settingsQuery());
     const data = await r.json();
     if (data.error) throw new Error(data.error);
     D = data; s7pos = null; s8sel = null;
+    $("status").textContent = `ran ${fmt(D.summary.reads)} reads in ${((performance.now() - t0) / 1000).toFixed(2)} s`;
     drawHeader(); drawNav(); draw();
   } catch (e) {
-    $("main").innerHTML = `<div class="err-box">Could not load the trace.\n\n${esc(e.message)}\n\nStart the server with: python web/server.py</div>`;
+    $("status").textContent = "";
+    $("main").innerHTML = `<div class="err-box">Could not run the pipeline.\n\n${esc(e.message)}\n\nIs the server running? Start it with: python web/server.py</div>`;
   }
 }
 
@@ -142,6 +203,7 @@ function drawHeader() {
   $("chips").innerHTML = [
     `Reference <b>${fmt(s.ref_len)}</b> letters`,
     `<b>${st.mutations}</b> planted, <b>${st.coverage}x</b>, <b>${(st.error_rate*100).toFixed(1)}%</b> errors, seed ${st.seed}`,
+    `min depth <b>${st.min_depth}</b>, edit limit <b>${st.max_edit}</b>`,
     `Reads placed <b>${fmt(s.placed)}</b> / ${fmt(s.reads)}`,
     `TP <b>${s.tp}</b> FP <b>${s.fp}</b> FN <b>${s.fn}</b>`,
   ].map(t => `<span class="chip">${t}</span>`).join("");
@@ -521,6 +583,7 @@ document.addEventListener("keydown", e => {
   if (e.key === "ArrowRight") go(stage + 1);
   if (e.key === "ArrowLeft") go(stage - 1);
 });
+drawSettings();
 load(-1);
 </script>
 </body>
