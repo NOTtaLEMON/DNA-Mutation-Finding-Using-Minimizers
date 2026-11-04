@@ -3,15 +3,17 @@
  * visualizer (web/index.html, served by web/server.py).
  *
  * Usage: trace [reference.fasta] [read_index] [mutations] [coverage]
- *              [error_rate] [seed] [min_depth] [max_edit]
+ *              [error_rate] [seed] [min_depth] [max_edit] [k] [w]
  * read_index -1 (the default) picks the first placed read that covers a
  * planted mutation. Defaults: 20 mutations, 30x, 1% errors, seed 42,
- * min depth 3, edit limit 3, so with no settings the trace matches demo.exe.
+ * min depth 3, edit limit 3, k 15, w 10, so with no settings the trace
+ * matches demo.exe.
  *
  * The pipeline runs over every read exactly as in demo.c. For the chosen read
  * the stage 4/5 loop and the stage 6 offers are repeated step by step so each
- * decision can be shown; the stage 7 DP table is recomputed for display only
- * (verify.c makes the real decision).
+ * decision can be shown. Two things are recomputed for display only: the
+ * stage 7 DP table and the stage 4 Bloom bit positions (the latter is checked
+ * against bloom_maybe_contains for every word, see bloom_positions).
  *
  * Build (from the repository root): same command as demo.c, with
  * src/demo/trace.c in place of src/demo/demo.c and -o trace.
@@ -25,11 +27,13 @@
 
 static const char LETTER[] = "ACGT";
 
-#define K 15
-#define W 10
 #define READ_LEN 150
 #define BLOOM_FP 0.01
 #define DP_SHOW_INF ((size_t)-1)
+#define MAX_BLOOM_HASHES 64
+
+/* k-mer length and window size; set from the command line in main. */
+static size_t K = 15, W = 10;
 
 /* Settings that the visualizer can change; everything else is fixed above. */
 typedef struct {
@@ -40,6 +44,11 @@ typedef struct {
     uint32_t min_depth;
     size_t max_edit;
 } TraceSettings;
+
+/* Whole-run totals for stages 4 and 5, shown in the page's pipeline funnel. */
+typedef struct {
+    size_t words, bloom_skipped, lookups, hits;
+} RunTotals;
 
 /* Prints a 64-bit hash as 16 hex digits in two halves (old MinGW printf has no %llx). */
 static void print_hash(uint64_t h)
@@ -58,12 +67,18 @@ static void print_letters(const Seq *s, size_t from, size_t len)
     putchar('"');
 }
 
-/* Stages 2 to 7 for one read, as in demo.c, with edit limit max_edit. Returns the accepted start, or -1. */
+/*
+ * Stages 2 to 7 for one read, as in demo.c, with edit limit max_edit.
+ * Adds to totals and writes how many candidates stage 6 short-listed.
+ * Returns the accepted start, or -1.
+ */
 static long place_read(const Seq *ref, const Seq *read, const Index *idx,
-                       const BloomFilter *bloom, size_t max_edit)
+                       const BloomFilter *bloom, size_t max_edit, RunTotals *totals,
+                       size_t *candidates)
 {
     MinimizerSet mins = {0};
     VoteTree tree = {0};
+    VoteStats st = {0, 0, 0, 0};
     Top3Heap top;
     TopCandidate sorted[TOP3_CAPACITY];
     size_t n = 0;
@@ -71,13 +86,18 @@ static long place_read(const Seq *ref, const Seq *read, const Index *idx,
     long placed = -1;
 
     if (minimizers_generate(read, K, W, &mins) == 0 &&
-        vote_read(read, &mins, idx, bloom, K, &tree, NULL) == 0 &&
+        vote_read(read, &mins, idx, bloom, K, &tree, &st) == 0 &&
         top3_from_vote_tree(&tree, &top) == 0 &&
         top3_get_sorted(&top, sorted, &n) == 0 &&
         verify_candidates(ref, read, sorted, n, VERIFY_DEFAULT_BAND, max_edit, &vr) == 0 &&
         vr.mapped)
         placed = vr.start;
 
+    *candidates = n;
+    totals->words += st.words;
+    totals->bloom_skipped += st.bloom_skipped;
+    totals->lookups += st.lookups;
+    totals->hits += st.hits;
     vote_tree_clear(&tree);
     minimizers_free(&mins);
     return placed;
@@ -222,7 +242,7 @@ static const char *status_name(VerifyCandidateStatus s)
     return "unknown";
 }
 
-/* Returns 1 if read r (true start s) covers any planted position, else 0. */
+/* Returns 1 if a read with true start s covers any planted position, else 0. */
 static int covers_mutation(const AnswerKey *key, size_t s)
 {
     size_t i;
@@ -233,12 +253,50 @@ static int covers_mutation(const AnswerKey *key, size_t s)
     return 0;
 }
 
+/* Display copy of bloom.c's SplitMix64 mixer (that one is static). */
+static uint64_t mix64(uint64_t x)
+{
+    x += UINT64_C(0x9e3779b97f4a7c15);
+    x = (x ^ (x >> 30)) * UINT64_C(0xbf58476d1ce4e5b9);
+    x = (x ^ (x >> 27)) * UINT64_C(0x94d049bb133111eb);
+    return x ^ (x >> 31);
+}
+
+/* Display copy of bloom.c's rotate-left. */
+static uint64_t rotl64(uint64_t x, unsigned int r)
+{
+    return (x << r) | (x >> (64U - r));
+}
+
+/*
+ * Writes the bit positions bloom.c tests for (hash, word_id), using the same
+ * double hashing h1 + i*h2 mod m. Returns 1 if they agree with
+ * bloom_maybe_contains (all bits set <=> "maybe"), 0 if this display copy has
+ * drifted from bloom.c.
+ */
+static int bloom_positions(const BloomFilter *bloom, uint64_t hash, uint64_t word_id,
+                           size_t *out)
+{
+    uint64_t h1 = mix64(hash ^ rotl64(word_id, 23) ^ UINT64_C(0x243f6a8885a308d3));
+    uint64_t h2 = mix64(word_id ^ rotl64(hash, 41) ^ UINT64_C(0x13198a2e03707344)) | UINT64_C(1);
+    size_t i;
+    int all_set = 1;
+
+    for (i = 0; i < bloom->hash_count && i < MAX_BLOOM_HASHES; i++) {
+        out[i] = (size_t)((h1 + (uint64_t)i * h2) % (uint64_t)bloom->bit_count);
+        if (!(bloom->bits[out[i] / 8] & (1u << (out[i] % 8))))
+            all_set = 0;
+    }
+    return all_set == (bloom_maybe_contains(bloom, hash, word_id) == 1);
+}
+
 /* Runs the whole pipeline, then prints the JSON trace for one read. */
 int main(int argc, char **argv)
 {
     const char *path = argc > 1 ? argv[1] : "sequence.fasta";
     long want = argc > 2 ? strtol(argv[2], NULL, 10) : -1;
     TraceSettings set;
+    RunTotals totals = {0, 0, 0, 0};
     Seq ref = {0}, sample = {0};
     MinimizerSet ref_mins = {0};
     Index idx = {0};
@@ -249,6 +307,7 @@ int main(int argc, char **argv)
     CallList calls = {0};
     uint32_t *depth = NULL;
     long *placed_at = NULL;
+    size_t *ncand = NULL;
     ScoreResult sc;
     SimRng rng;
     size_t i, placed = 0, misplaced = 0, chosen;
@@ -260,6 +319,12 @@ int main(int argc, char **argv)
     set.seed = argc > 6 ? strtoul(argv[6], NULL, 10) : 42;
     set.min_depth = argc > 7 ? (uint32_t)strtoul(argv[7], NULL, 10) : PILEUP_DEFAULT_MIN_DEPTH;
     set.max_edit = argc > 8 ? (size_t)strtoul(argv[8], NULL, 10) : VERIFY_DEFAULT_MAX_EDIT_DISTANCE;
+    K = argc > 9 ? (size_t)strtoul(argv[9], NULL, 10) : 15;
+    W = argc > 10 ? (size_t)strtoul(argv[10], NULL, 10) : 10;
+    if (K < 4 || K > 32 || W < 1) {
+        printf("{\"error\":\"k must be 4..32 and w at least 1\"}\n");
+        return 1;
+    }
 
     if (seq_load_fasta(path, &ref) != 0) {
         printf("{\"error\":\"could not load %s\"}\n", path);
@@ -279,11 +344,13 @@ int main(int argc, char **argv)
 
     /* Stages 2 to 8 for every read, remembering where each one was placed. */
     placed_at = (long *)malloc(reads.count * sizeof *placed_at);
+    ncand = (size_t *)malloc(reads.count * sizeof *ncand);
     depth = (uint32_t *)malloc(ref.len * sizeof *depth);
-    if (placed_at == NULL || depth == NULL)
+    if (placed_at == NULL || ncand == NULL || depth == NULL)
         goto done;
     for (i = 0; i < reads.count; i++) {
-        placed_at[i] = place_read(&ref, &reads.reads[i], &idx, &bloom, set.max_edit);
+        placed_at[i] = place_read(&ref, &reads.reads[i], &idx, &bloom, set.max_edit,
+                                  &totals, &ncand[i]);
         if (placed_at[i] < 0)
             continue;
         placed++;
@@ -308,10 +375,11 @@ int main(int argc, char **argv)
             }
     }
 
-    printf("{\"settings\":{\"k\":%d,\"w\":%d,\"read_len\":%d,\"mutations\":%lu,\"coverage\":%g,"
+    printf("{\"settings\":{\"k\":%lu,\"w\":%lu,\"read_len\":%d,\"mutations\":%lu,\"coverage\":%g,"
            "\"error_rate\":%g,\"seed\":%lu,\"band\":%lu,\"max_edit\":%lu,\"min_depth\":%lu,"
            "\"min_alt_pct\":%lu,\"bloom_fp\":%.2f},\n",
-           K, W, READ_LEN, (unsigned long)set.mutations, set.coverage, set.error_rate, set.seed,
+           (unsigned long)K, (unsigned long)W, READ_LEN, (unsigned long)set.mutations,
+           set.coverage, set.error_rate, set.seed,
            (unsigned long)VERIFY_DEFAULT_BAND, (unsigned long)set.max_edit,
            (unsigned long)set.min_depth, (unsigned long)PILEUP_DEFAULT_MIN_ALT_PERCENT,
            BLOOM_FP);
@@ -319,23 +387,31 @@ int main(int argc, char **argv)
            "\"unplaced\":%lu,\"misplaced\":%lu,\"ref_minimizers\":%lu,\"index_entries\":%lu,"
            "\"nbuckets\":%lu,\"bloom_bits\":%lu,\"bloom_hashes\":%lu,\"calls\":%lu,\"tp\":%lu,"
            "\"fp\":%lu,\"fn\":%lu,\"callable\":%lu,\"precision\":%.1f,\"recall_all\":%.1f,"
-           "\"recall_callable\":%.1f},\n",
+           "\"recall_callable\":%.1f,\"words\":%lu,\"bloom_skipped\":%lu,\"lookups\":%lu,\"votes\":%lu},\n",
            (unsigned long)ref.len, (unsigned long)ref.nruns, (unsigned long)reads.count,
            (unsigned long)placed, (unsigned long)(reads.count - placed), (unsigned long)misplaced,
            (unsigned long)ref_mins.count, (unsigned long)idx.nentries, (unsigned long)idx.nbuckets,
            (unsigned long)bloom.bit_count, (unsigned long)bloom.hash_count,
            (unsigned long)calls.count, (unsigned long)sc.tp, (unsigned long)sc.fp,
            (unsigned long)sc.fn, (unsigned long)sc.callable, sc.precision_pct,
-           sc.recall_all_pct, sc.recall_callable_pct);
+           sc.recall_all_pct, sc.recall_callable_pct, (unsigned long)totals.words,
+           (unsigned long)totals.bloom_skipped, (unsigned long)totals.lookups,
+           (unsigned long)totals.hits);
 
-    /* Reads worth picking in the page: covering a mutation, and some not placed. */
+    /* Reads worth picking: over a mutation, with 2+ candidate starts, and not placed. */
     {
-        size_t shown = 0;
+        size_t shown = 0, multi = 0;
         printf("\"interesting\":{\"covers_mutation\":[");
         for (i = 0; i < reads.count && shown < 40; i++)
             if (placed_at[i] >= 0 && covers_mutation(&key, reads.true_start[i]))
                 printf("%s%lu", shown++ ? "," : "", (unsigned long)i);
-        printf("],\"not_placed\":[");
+        printf("],\"multi_candidate\":[");
+        for (i = 0; i < reads.count && multi < 20; i++)
+            if (ncand[i] >= 2)
+                printf("%s%lu", multi++ ? "," : "", (unsigned long)i);
+        for (i = 0, multi = 0; i < reads.count; i++)
+            multi += ncand[i] >= 2;
+        printf("],\"multi_candidate_total\":%lu,\"not_placed\":[", (unsigned long)multi);
         for (i = 0, shown = 0; i < reads.count && shown < 15; i++)
             if (placed_at[i] < 0)
                 printf("%s%lu", shown++ ? "," : "", (unsigned long)i);
@@ -365,7 +441,7 @@ int main(int argc, char **argv)
                 first = 0;
             }
         printf("],\"packed_bytes\":[");
-        for (i = 0; i < 4 && i < rd->cells_cap; i++)
+        for (i = 0; i < (rd->len + 3) / 4; i++)
             printf("%s%u", i ? "," : "", (unsigned)rd->cells[i]);
         printf("]},\n");
     }
@@ -378,8 +454,9 @@ int main(int argc, char **argv)
         Top3Heap top;
         OfferTrace ot;
         TopCandidate sorted[TOP3_CAPACITY];
-        size_t n = 0, c;
+        size_t n = 0, c, bits[MAX_BLOOM_HASHES];
         VerifyResult vr;
+        int bloom_ok = 1;
 
         /* Window of 1 k-mer keeps every k-mer, giving every hash with stage 2's own function. */
         if (minimizers_generate(rd, K, 1, &all) != 0 || minimizers_generate(rd, K, W, &mins) != 0)
@@ -405,12 +482,15 @@ int main(int argc, char **argv)
             const IndexEntry *e = NULL;
             const PosNode *p;
 
+            bloom_ok &= bloom_positions(&bloom, hash, wid, bits);
             printf("%s{\"pos\":%lu,\"word\":", i ? "," : "", (unsigned long)pos);
             print_letters(rd, pos, K);
             printf(",\"hash\":");
             print_hash(hash);
-            printf(",\"bloom\":%d,\"bucket\":%lu", maybe,
-                   (unsigned long)(hash % (uint64_t)idx.nbuckets));
+            printf(",\"bloom\":%d,\"bits\":[", maybe);
+            for (c = 0; c < bloom.hash_count && c < MAX_BLOOM_HASHES; c++)
+                printf("%s%lu", c ? "," : "", (unsigned long)bits[c]);
+            printf("],\"bucket\":%lu", (unsigned long)(hash % (uint64_t)idx.nbuckets));
             if (maybe == 1)
                 e = index_lookup(&idx, hash, wid, &probes);
             printf(",\"looked_up\":%d,\"probes\":%lu,\"ref_positions\":[", maybe == 1,
@@ -424,7 +504,7 @@ int main(int argc, char **argv)
                 printf("%s%ld", c ? "," : "", (long)p->pos - (long)pos);
             printf("]}");
         }
-        printf("],\n");
+        printf("],\"bloom_display_matches_c\":%d,\n", bloom_ok);
 
         printf("\"stage5\":{\"nodes\":%lu,\"height\":%lu,\"tree\":",
                (unsigned long)tree.nodes, (unsigned long)vote_tree_height(&tree));
@@ -476,17 +556,47 @@ int main(int argc, char **argv)
         minimizers_free(&mins);
     }
 
+    /* Stage 3's whole table: every entry in bucket order, then chain order. */
+    printf("\"index\":[");
+    for (i = 0, rc = 0; i < idx.nbuckets; i++) {      /* rc doubles as "printed one already" */
+        const IndexEntry *e;
+        for (e = idx.buckets[i]; e != NULL; e = e->next) {
+            const PosNode *p;
+            size_t c = 0;
+            printf("%s[%lu,", rc ? "," : "", (unsigned long)i);
+            print_letters(&ref, e->pos_head->pos, K);
+            printf(",[");
+            for (p = e->pos_head; p != NULL; p = p->next)
+                printf("%s%lu", c++ ? "," : "", (unsigned long)p->pos);
+            printf("]]");
+            rc = 1;
+        }
+    }
+    rc = 1;                                            /* back to "failed" until the end */
+    printf("],\n");
+
+    /* Stage 4's whole bit array as hex, byte by byte (bit 0 of a byte = lowest bit). */
+    printf("\"bloom\":{\"m\":%lu,\"h\":%lu,\"hex\":\"", (unsigned long)bloom.bit_count,
+           (unsigned long)bloom.hash_count);
+    for (i = 0; i < bloom.byte_count; i++)
+        printf("%02x", (unsigned)bloom.bits[i]);
+    printf("\"},\n");
+
     /* Stage 8: the pile-up under this read (all placed reads counted). */
     {
         size_t s = placed_at[chosen] >= 0 ? (size_t)placed_at[chosen] : reads.true_start[chosen];
         size_t len = READ_LEN < ref.len - s ? READ_LEN : ref.len - s;
-        size_t first = 1;
+        size_t first = 1, shown;
 
-        printf("\"stage8\":{\"span_start\":%lu,\"ref_letters\":", (unsigned long)s);
+        printf("\"stage8\":{\"span_start\":%lu,\"depth_before\":%lu,\"ref_letters\":",
+               (unsigned long)s, (unsigned long)(s > 0 ? depth[s - 1] : 0));
         print_letters(&ref, s, len);
         printf(",\"depth\":[");
         for (i = 0; i < len; i++)
             printf("%s%lu", i ? "," : "", (unsigned long)depth[s + i]);
+        printf("],\"diff\":[");
+        for (i = 0; i < len; i++)
+            printf("%s%ld", i ? "," : "", (long)pile.diff[s + i]);
         printf("],\"counts\":[");
         for (i = 0; i < len; i++) {
             const uint32_t *ct = pile.cells[s + i].count;
@@ -499,15 +609,40 @@ int main(int argc, char **argv)
                 printf("%s%lu", first ? "" : ",", (unsigned long)(calls.items[i].pos - s));
                 first = 0;
             }
+        /* The placed reads that overlap this span (up to 60), so the page can stack them. */
+        printf("],\"reads\":[");
+        for (i = 0, shown = 0; i < reads.count && shown < 60; i++) {
+            long ps = placed_at[i];
+            if (ps < 0 || (size_t)ps >= s + len || (size_t)ps + READ_LEN <= s)
+                continue;
+            printf("%s{\"index\":%lu,\"start\":%ld,\"letters\":", shown ? "," : "",
+                   (unsigned long)i, ps);
+            print_letters(&reads.reads[i], 0, reads.reads[i].len);
+            putchar('}');
+            shown++;
+        }
         printf("]},\n");
     }
 
     /* Stage 9: the whole key and every call, for the genome-wide picture. */
     printf("\"stage9\":{\"key\":[");
-    for (i = 0; i < key.count; i++)
-        printf("%s{\"pos\":%lu,\"ref\":\"%c\",\"alt\":\"%c\",\"depth\":%lu}", i ? "," : "",
-               (unsigned long)key.items[i].pos, LETTER[key.items[i].ref],
-               LETTER[key.items[i].alt], (unsigned long)depth[key.items[i].pos]);
+    for (i = 0; i < key.count; i++) {
+        /* Context letters, pile-up counts and one placed read over it, for the page's zoom and jump. */
+        size_t p = key.items[i].pos, from = p >= 12 ? p - 12 : 0, r;
+        size_t to = p + 13 < ref.len ? p + 13 : ref.len;
+        const uint32_t *ct = pile.cells[p].count;
+        long over = -1;
+        for (r = 0; r < reads.count && over < 0; r++)
+            if (placed_at[r] >= 0 && (size_t)placed_at[r] <= p && (size_t)placed_at[r] + READ_LEN > p)
+                over = (long)r;
+        printf("%s{\"pos\":%lu,\"ref\":\"%c\",\"alt\":\"%c\",\"depth\":%lu,\"read\":%ld,"
+               "\"context_start\":%lu,\"context\":", i ? "," : "", (unsigned long)p,
+               LETTER[key.items[i].ref], LETTER[key.items[i].alt], (unsigned long)depth[p], over,
+               (unsigned long)from);
+        print_letters(&ref, from, to - from);
+        printf(",\"counts\":[%lu,%lu,%lu,%lu]}", (unsigned long)ct[0], (unsigned long)ct[1],
+               (unsigned long)ct[2], (unsigned long)ct[3]);
+    }
     printf("],\"calls\":[");
     for (i = 0; i < calls.count; i++) {
         const MutationCall *m = &calls.items[i];
@@ -520,11 +655,15 @@ int main(int argc, char **argv)
     printf("],\"depth_sample\":[");
     for (i = 0; i < ref.len; i += 100)
         printf("%s%lu", i ? "," : "", (unsigned long)depth[i]);
-    printf("]}}\n");
+    /* The whole reference (about 30 KB), so the page's helix shows real letters at any zoom. */
+    printf("],\"genome\":");
+    print_letters(&ref, 0, ref.len);
+    printf("}}\n");
     rc = 0;
 
 done:
     free(placed_at);
+    free(ncand);
     free(depth);
     calls_free(&calls);
     pileup_free(&pile);

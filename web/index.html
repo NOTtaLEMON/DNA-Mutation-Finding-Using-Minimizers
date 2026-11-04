@@ -3,588 +3,1040 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Mutation Finder Steps</title>
+<title>Mutation Finder Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg: #f6f7f9; --panel: #ffffff; --ink: #1d2330; --muted: #5d6677; --line: #dde1e8;
-  --accent: #3b5bdb; --soft: #eef1fb;
-  --A: #2b9a57; --C: #2f6fd6; --G: #d98a1f; --T: #d64545;
-  --tp: #2b9a57; --fn: #d64545; --fp: #e08a12; --mut: #8a3ffc; --err: #9aa3b2;
+  --bg: #efeee9; --panel: #ffffff; --sub: #f7f6f2; --ink: #17191e; --muted: #5d636f; --line: #cfccc2; --line2: #e4e2db;
+  --mark: #ffd84a; --markSoft: #fff3bf;
+  --A: #1e9a58; --C: #2c63c9; --G: #d08a00; --T: #d4373f;
+  --tp: #1e9a58; --fn: #d4373f; --fp: #b8650a;
+  --sans: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; --mono: "IBM Plex Mono", Consolas, ui-monospace, monospace;
 }
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
-    --bg: #12151b; --panel: #1b2029; --ink: #e7eaf0; --muted: #9aa3b2; --line: #2c3340;
-    --accent: #7c95ff; --soft: #232a3a;
-  }
-}
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
-header { padding: 16px 24px; border-bottom: 1px solid var(--line); background: var(--panel);
-  display: flex; flex-wrap: wrap; gap: 12px 24px; align-items: center; }
-header h1 { font-size: 18px; margin: 0; }
-.chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip { background: var(--soft); border-radius: 999px; padding: 2px 10px; font-size: 13px; }
-.chip b { font-variant-numeric: tabular-nums; }
-.picker { margin-left: auto; display: flex; gap: 8px; align-items: center; font-size: 13px; }
-select, button { font: inherit; color: var(--ink); background: var(--panel); border: 1px solid var(--line);
-  border-radius: 6px; padding: 4px 10px; cursor: pointer; }
-button:hover { border-color: var(--accent); }
-button:disabled { opacity: .4; cursor: default; }
-.settings { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; padding: 10px 24px;
-  background: var(--panel); border-bottom: 1px solid var(--line); font-size: 13px; }
-.settings label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
-.settings input { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
-  border-radius: 6px; padding: 4px 8px; width: 110px; }
-.settings .run { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 600; }
-.settings .status { color: var(--muted); }
-.settings .presets { display: flex; gap: 6px; align-items: center; }
-.layout { display: grid; grid-template-columns: 220px 1fr; min-height: calc(100vh - 66px); }
-nav { border-right: 1px solid var(--line); padding: 12px 8px; background: var(--panel); }
-nav button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 8px 10px;
-  border-radius: 6px; margin-bottom: 2px; }
-nav button.on { background: var(--soft); color: var(--accent); font-weight: 600; }
-nav small { color: var(--muted); display: block; font-size: 12px; }
-main { padding: 20px 28px 80px; max-width: 1100px; min-width: 0; }
-h2 { margin: 0 0 4px; font-size: 22px; }
-.ds { color: var(--muted); font-size: 13px; margin-bottom: 14px; }
-.explain { background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--accent);
-  border-radius: 8px; padding: 12px 16px; margin-bottom: 18px; }
-.explain p { margin: 4px 0; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px;
-  margin-bottom: 16px; overflow-x: auto; }
-.card h3 { margin: 0 0 10px; font-size: 15px; }
-.seq { font-family: ui-monospace, Consolas, monospace; font-size: 13px; line-height: 1; }
-.row { display: flex; align-items: center; gap: 0; margin-bottom: 4px; }
-.row .lbl { width: 70px; color: var(--muted); font-size: 12px; font-family: system-ui, sans-serif; flex: none; }
-.b { width: 15px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
-  color: #fff; font-weight: 600; border-radius: 2px; margin-right: 1px; flex: none; }
+* { box-sizing: border-box; border-radius: 0 !important; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 14.5px/1.5 var(--sans); }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 18px 20px 60px; }
+section, header { background: var(--panel); border: 1px solid var(--line); margin-bottom: 14px; }
+header { padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; }
+header h1 { font-size: 22px; margin: 0; font-weight: 700; letter-spacing: -.2px; }
+header p { margin: 0; color: var(--muted); flex: 1 1 420px; }
+#status { font-family: var(--mono); font-size: 12.5px; padding: 3px 8px; border: 1px solid var(--line); background: var(--sub); }
+#status.busy { background: var(--markSoft); }
+.sec-h { display: flex; flex-wrap: wrap; gap: 6px 16px; align-items: baseline; padding: 10px 16px; border-bottom: 1px solid var(--line2); }
+.sec-h h2 { margin: 0; font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; }
+.sec-h span { color: var(--muted); font-size: 13px; }
+.sec-b { padding: 14px 16px; }
+h3 { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.btn { font: 500 13px var(--sans); color: var(--ink); background: var(--panel); border: 1px solid var(--ink); padding: 5px 11px; cursor: pointer; }
+.btn:hover { background: var(--markSoft); }
+.btn.solid { background: var(--ink); color: #fff; }
+.btn.solid:hover { background: #343841; }
+.btn:disabled { opacity: .35; cursor: default; background: var(--panel); }
+.row-btns { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.hint { color: var(--muted); font-size: 12.5px; }
+.mono { font-family: var(--mono); }
+
+/* sliders */
+.sliders { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px 22px; }
+.sl label { display: flex; justify-content: space-between; font-weight: 600; font-size: 13px; }
+.sl output { font-family: var(--mono); font-weight: 600; background: var(--markSoft); padding: 0 5px; }
+.sl p { margin: 2px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+input[type=range] { width: 100%; accent-color: var(--ink); margin: 6px 0 0; }
+.presets { margin-top: 12px; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+
+/* results */
+.grid2 { display: grid; grid-template-columns: 1.45fr 1fr; gap: 14px; }
+#scope { width: 100%; height: 300px; display: block; border: 1px solid var(--line2); background: var(--sub); cursor: grab; touch-action: none; }
+.funnel { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid var(--line2); margin-top: 12px; }
+.funnel div { padding: 8px 10px; border-right: 1px solid var(--line2); cursor: pointer; }
+.funnel div:last-child { border-right: 0; }
+.funnel div:hover { background: var(--markSoft); }
+.funnel b { display: block; font: 600 18px var(--mono); }
+.funnel small { color: var(--muted); font-size: 11.5px; display: block; line-height: 1.3; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { border-bottom: 1px solid var(--line2); padding: 4px 8px; text-align: left; white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--panel); }
+tr.click { cursor: pointer; } tr.click:hover td { background: var(--markSoft); } tr.on td { background: var(--mark); }
+.tag { display: inline-block; padding: 0 6px; font: 600 11.5px var(--mono); border: 1px solid; }
+.tag.tp { color: var(--tp); } .tag.fn { color: var(--fn); } .tag.fp { color: var(--fp); } .tag.n { color: var(--muted); }
+.scroll { max-height: 300px; overflow: auto; border: 1px solid var(--line2); }
+
+/* explorer */
+.picker { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+select { font: 13px var(--sans); border: 1px solid var(--ink); padding: 4px 6px; background: var(--panel); }
+.tabs { display: flex; flex-wrap: wrap; border-bottom: 1px solid var(--ink); margin-top: 12px; }
+.tab { font: 500 13px var(--sans); background: none; border: 1px solid transparent; border-bottom: 0; padding: 6px 12px; cursor: pointer; color: var(--muted); margin-bottom: -1px; }
+.tab.on { border-color: var(--ink); background: var(--panel); color: var(--ink); font-weight: 700; }
+.tab:hover:not(.on) { color: var(--ink); }
+.stage-h { margin: 14px 0 6px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.stage-h h2 { margin: 0; font-size: 19px; }
+.ds { font: 600 12px var(--mono); border: 1px solid var(--ink); padding: 1px 6px; }
+.what { margin: 0 0 12px; max-width: 980px; }
+.box { border: 1px solid var(--line); background: var(--panel); padding: 12px; margin-bottom: 12px; overflow-x: auto; }
+.box.sub { background: var(--sub); }
+.cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.note { border-left: 4px solid var(--mark); background: var(--markSoft); padding: 8px 12px; margin: 0 0 12px; max-width: 980px; }
+
+/* letters */
+.b { display: inline-flex; width: 17px; height: 22px; align-items: center; justify-content: center; font: 600 12px var(--mono);
+  color: #fff; margin: 0 1px 1px 0; flex: none; cursor: pointer; position: relative; }
 .b.A { background: var(--A); } .b.C { background: var(--C); } .b.G { background: var(--G); } .b.T { background: var(--T); }
-.b.mut { outline: 3px solid var(--mut); outline-offset: -1px; }
-.b.err { box-shadow: inset 0 -5px 0 rgba(0,0,0,.45); }
-.b.dim { opacity: .25; }
-.b.mis { outline: 2px solid var(--ink); outline-offset: -1px; }
-.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 8px; }
-.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; vertical-align: -2px; margin-right: 4px; }
-table { border-collapse: collapse; font-size: 13px; width: 100%; }
-th, td { border-bottom: 1px solid var(--line); padding: 5px 8px; text-align: left; white-space: nowrap; }
-th { color: var(--muted); font-weight: 600; }
-td.mono, .mono { font-family: ui-monospace, Consolas, monospace; }
-.tag { display: inline-block; border-radius: 4px; padding: 0 6px; font-size: 12px; font-weight: 600; }
-.tag.ok { background: #d9f2e3; color: #17663a; } .tag.no { background: #fbe0e0; color: #9b2222; }
-.tag.mid { background: #fdebd0; color: #8a5300; } .tag.info { background: var(--soft); color: var(--accent); }
-.big { font-size: 28px; font-weight: 700; font-variant-numeric: tabular-nums; }
-.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 16px; }
-.stat { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 10px 14px; }
-.stat span { color: var(--muted); font-size: 12px; display: block; }
-.footer-nav { position: fixed; bottom: 0; left: 220px; right: 0; padding: 10px 28px; background: var(--panel);
-  border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; }
-.footer-nav .hint { color: var(--muted); font-size: 12px; }
-svg text { font-family: system-ui, sans-serif; }
-input[type=range] { width: 100%; }
-.err-box { background: #fbe0e0; color: #9b2222; padding: 16px; border-radius: 8px; white-space: pre-wrap; }
-.dp-small td { text-align: center; min-width: 26px; padding: 3px; font-family: ui-monospace, Consolas, monospace; }
-.dp-small td.inf { color: var(--muted); }
-.dp-small td.path { background: var(--soft); font-weight: 700; }
-@media (max-width: 760px) {
-  .layout { grid-template-columns: 1fr; } nav { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--line); }
-  nav button { width: auto; white-space: nowrap; } nav small { display: none; }
-  .footer-nav { left: 0; } main { padding: 16px; } .picker { margin-left: 0; }
-}
+.b.pale { opacity: .22; } .b.same { opacity: .55; }
+.b.sel { outline: 3px solid var(--ink); outline-offset: -1px; z-index: 2; }
+.b.mutcol { box-shadow: 0 0 0 4px var(--mark), 0 0 0 5px var(--ink); z-index: 1; }
+.b.inwin { box-shadow: 0 -5px 0 var(--mark), 0 5px 0 var(--mark); }
+.b.minw { box-shadow: 0 -5px 0 var(--ink), 0 5px 0 var(--ink); }
+.lane { display: flex; align-items: center; }
+.lane .lbl { width: 92px; flex: none; font-size: 11.5px; color: var(--muted); }
+.markrow { display: flex; height: 26px; margin-left: 92px; position: relative; }
+.mk { position: absolute; top: 0; transform: translateX(-50%); font: 700 11px var(--sans); white-space: nowrap; padding: 2px 5px; border: 1px solid var(--ink); background: var(--mark); }
+.mk.err { background: #fff; border-style: dashed; color: var(--fn); font-weight: 600; }
+.colband { position: absolute; top: 0; bottom: 0; width: 18px; background: var(--mark); z-index: 0; }
+
+/* data-structure cells */
+.cells { display: flex; flex-wrap: wrap; gap: 3px; }
+.cell { border: 1px solid var(--line); background: var(--panel); padding: 3px 6px; font: 12px var(--mono); cursor: pointer; min-width: 30px; text-align: center; }
+.cell.on { background: var(--mark); border-color: var(--ink); }
+.cell.dim { opacity: .4; }
+.cell.ok { border-color: var(--tp); color: var(--tp); } .cell.no { border-color: var(--fn); color: var(--fn); }
+.byte { display: inline-flex; flex-direction: column; border: 1px solid var(--line); margin: 0 3px 3px 0; cursor: pointer; }
+.byte .q { display: flex; } .byte .q span { width: 22px; height: 18px; font: 600 10.5px var(--mono); color: #fff; display: flex; align-items: center; justify-content: center; }
+.byte small { font: 10.5px var(--mono); text-align: center; color: var(--muted); }
+.byte.on { outline: 3px solid var(--ink); }
+.dq { display: flex; align-items: stretch; gap: 0; min-height: 58px; }
+.dq .item { border: 1px solid var(--ink); border-right-width: 0; padding: 4px 8px; font: 12px var(--mono); background: var(--panel); transition: opacity .35s, transform .35s; }
+.dq .item:last-child { border-right-width: 1px; }
+.dq .item.front { background: var(--mark); }
+.dq .item.new { transform: translateY(-8px); }
+.dq .item.gone { opacity: .25; text-decoration: line-through; }
+.dq-end { font: 11px var(--sans); color: var(--muted); padding: 0 8px; align-self: center; }
+.chain { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
+.node { border: 1px solid var(--ink); background: var(--panel); padding: 4px 8px; font: 12px var(--mono); }
+.node.hit { background: var(--mark); } .node.miss { opacity: .45; }
+.node.cmp { outline: 3px solid var(--ink); }
+.arr { color: var(--muted); font: 12px var(--mono); }
+.plist { display: inline-flex; align-items: center; gap: 2px; margin-left: 6px; }
+.plist .p { border: 1px solid var(--line); padding: 0 4px; font: 11px var(--mono); background: var(--sub); }
+canvas.cv { display: block; image-rendering: pixelated; }
+.eq { font: 13px var(--mono); background: var(--sub); border: 1px solid var(--line2); padding: 6px 10px; margin: 6px 0; min-height: 30px; }
+.heapwrap { display: flex; gap: 30px; flex-wrap: wrap; align-items: flex-start; }
+.harr { display: flex; }
+.harr div { border: 1px solid var(--ink); border-right-width: 0; width: 120px; padding: 6px; text-align: center; font: 12px var(--mono); transition: background .3s; }
+.harr div:last-child { border-right-width: 1px; }
+.harr div small { display: block; color: var(--muted); font-family: var(--sans); }
+.harr div.hot { background: var(--mark); }
+.log { font: 12px var(--mono); max-height: 180px; overflow: auto; border: 1px solid var(--line2); padding: 6px 8px; background: var(--sub); }
+.log div { padding: 1px 0; }
+.dpt td { text-align: center; min-width: 28px; padding: 3px; font: 12px var(--mono); border: 1px solid var(--line2); cursor: pointer; }
+.dpt td.out { background: #f1f0eb; color: #b5b3ab; cursor: default; }
+.dpt td.diag { font-weight: 700; }
+.dpt td.pick { background: var(--mark); outline: 2px solid var(--ink); }
+.dpt td.src { background: var(--markSoft); }
+.dpt td.hdr { border: 0; cursor: default; padding: 0; }
+.bsearch { display: flex; flex-wrap: wrap; gap: 0; }
+.bsearch div { border: 1px solid var(--line); margin: 0 -1px -1px 0; padding: 3px 5px; font: 11.5px var(--mono); min-width: 50px; text-align: center; position: relative; }
+.bsearch div.rng { background: var(--markSoft); } .bsearch div.mid { background: var(--mark); outline: 2px solid var(--ink); z-index: 1; } .bsearch div.out { opacity: .3; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 12px; color: var(--muted); margin-top: 6px; }
+.legend i { display: inline-block; width: 11px; height: 11px; vertical-align: -1px; margin-right: 4px; border: 1px solid var(--line); }
+.err-box { border: 1px solid var(--fn); padding: 14px; white-space: pre-wrap; background: #fff5f5; }
+@media (max-width: 900px) { .grid2, .cols { grid-template-columns: 1fr; } .funnel { grid-template-columns: repeat(2, 1fr); } }
 </style>
 </head>
 <body>
+<div class="wrap">
+
 <header>
-  <h1>Minimizer Mutation Finder: one read, step by step</h1>
-  <div class="chips" id="chips"></div>
-  <div class="picker">
-    <label for="readSel">Read</label>
-    <select id="readSel"></select>
-  </div>
+  <h1>Mutation Finder Lab</h1>
+  <p>Finds single-letter mutations in a sample of the SARS-CoV-2 genome (29,903 letters) using minimizers, a hash index, a Bloom filter,
+  a vote tree, a heap, edit distance and a pile-up. Every number below comes from the C program, rerun each time you change a setting.</p>
+  <span id="status">starting</span>
 </header>
-<form class="settings" id="settings" onsubmit="event.preventDefault(); load(-1);">
-  <span id="settingInputs" style="display:contents"></span>
-  <button type="submit" class="run">Run pipeline</button>
-  <span class="presets">Try:
-    <button type="button" onclick="preset('default')">Default</button>
-    <button type="button" onclick="preset('hard')">Low coverage, 2% errors</button>
-    <button type="button" onclick="preset('loose')">2% errors, edit limit 6</button>
-    <button type="button" onclick="preset('depth1')">Min depth 1, 3x</button>
-  </span>
-  <span class="status" id="status"></span>
-</form>
-<div class="layout">
-  <nav id="nav"></nav>
-  <main id="main"><p>Running the C pipeline ...</p></main>
+
+<section>
+  <div class="sec-h"><h2>1 · Experiment</h2><span>Move a slider and let go: the C pipeline reruns on all reads.</span></div>
+  <div class="sec-b">
+    <div class="sliders" id="sliders"></div>
+    <div class="presets">Scenarios:
+      <button class="btn" data-preset="default">Default</button>
+      <button class="btn" data-preset="hard">Low coverage, 2% errors</button>
+      <button class="btn" data-preset="loose">2% errors, edit limit 6</button>
+      <button class="btn" data-preset="depth1">Min depth 1 at 3x</button>
+      <button class="btn" data-preset="noisy">10% errors</button>
+      <button class="btn" data-preset="smallk">Small k (repeats)</button>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-h"><h2>2 · Result over the whole genome</h2><span>All reads were placed and piled up; these are every planted mutation and every call.</span></div>
+  <div class="sec-b">
+    <div class="grid2">
+      <div>
+        <canvas id="scope"></canvas>
+        <div class="row-btns" style="margin-top:8px">
+          <button class="btn" id="zoomOut">Whole genome</button>
+          <button class="btn" id="mPrev">◀ previous mutation</button>
+          <button class="btn" id="mNext">next mutation ▶</button>
+          <span class="hint">Scroll = zoom · drag = pan · click the ruler = jump · click a row on the right = fly there</span>
+        </div>
+      </div>
+      <div>
+        <div id="scoreLine" style="margin-bottom:6px"></div>
+        <div class="scroll" id="mutTable"></div>
+      </div>
+    </div>
+    <div class="funnel" id="funnel"></div>
+  </div>
+</section>
+
+<section id="explorer">
+  <div class="sec-h"><h2>3 · Inside the pipeline</h2><span id="readFrame"></span></div>
+  <div class="sec-b">
+    <div class="picker">
+      <label for="readSel"><b>Read to inspect</b></label><select id="readSel"></select>
+      <span class="hint" id="readHint"></span>
+      <span style="flex:1"></span>
+      <label for="speed" class="hint">animation speed</label><input type="range" id="speed" min="0.25" max="3" step="0.25" value="1" style="width:110px">
+    </div>
+    <div class="tabs" id="tabs"></div>
+    <div class="stage-h"><h2 id="sTitle"></h2><span class="ds" id="sDS"></span></div>
+    <p class="what" id="sWhat"></p>
+    <div id="stage"></div>
+  </div>
+</section>
 </div>
-<div class="footer-nav">
-  <button id="prev">&larr; Previous</button>
-  <span class="hint">Use the arrow keys to step</span>
-  <button id="next">Next &rarr;</button>
-</div>
+
 <script>
-const STAGES = [
-  ["Load", "2-bit packed array"],
-  ["Minimizers", "Sliding window, monotonic queue"],
-  ["Index lookup", "Hash table with chaining"],
-  ["Bloom filter", "Bit array, 7 hash functions"],
-  ["Vote", "Binary search tree"],
-  ["Top 3", "Min-heap of size 3"],
-  ["Verify", "Banded edit-distance table"],
-  ["Pile-up", "Counting array + difference array"],
-  ["Score", "Sorted array + binary search"],
-];
-const L = "ACGT";
-let D = null, stage = 0, s7pos = null, s8sel = null;
-
+/* ================= helpers ================= */
 const $ = id => document.getElementById(id);
+const L = "ACGT", COMP = { A: "T", C: "G", G: "C", T: "A" };
+const COL = { A: "#1e9a58", C: "#2c63c9", G: "#d08a00", T: "#d4373f" };
 const fmt = n => Number(n).toLocaleString("en-US");
-const esc = s => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "\"": "&quot;" }[c]));
+const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const tile = (ch, cls = "", attrs = "") => `<span class="b ${ch} ${cls}" ${attrs}>${ch}</span>`;
+let D = null, stage = 0;
+const sel = { word: 0 };        // the minimizer chosen to follow through stages 2-5
 
-/* Settings the C pipeline accepts: [name, label, default, min, max, step]. Ranges match web/server.py. */
+/* Animation control: nothing animates unless a button starts it; a new start cancels the old one. */
+const CANCEL = Symbol("cancel");
+let token = 0;
+async function wait(ms, tok) {
+  await new Promise(r => setTimeout(r, ms / +$("speed").value));
+  if (tok !== token) throw CANCEL;
+}
+async function animate(fn) {
+  const tok = ++token;
+  try { await fn(tok); } catch (e) { if (e !== CANCEL) console.error(e); }
+}
+const stopAnim = () => { token++; };
+
+/* ================= settings ================= */
 const SETTINGS = [
-  ["mutations", "Planted mutations", 20, 1, 500, 1],
-  ["coverage", "Coverage (x)", 30, 1, 100, 1],
-  ["error_rate", "Sequencing errors (%)", 1, 0, 10, 0.1],
-  ["seed", "Random seed", 42, 0, 1000000000, 1],
-  ["min_depth", "Min depth (stage 8)", 3, 1, 50, 1],
-  ["max_edit", "Edit limit (stage 7)", 3, 0, 10, 1],
+  { name: "mutations", label: "Planted mutations", min: 1, max: 200, step: 1, def: 20, show: v => v,
+    help: "How many single-letter changes are hidden in the sample copy of the genome (the answer key)." },
+  { name: "coverage", label: "Coverage", min: 1, max: 60, step: 1, def: 30, show: v => v + "x",
+    help: "How many reads lie over each letter on average. More coverage = more evidence per position." },
+  { name: "error_rate", label: "Sequencer error rate", min: 0, max: 10, step: .1, def: 1, show: v => (+v).toFixed(1) + "%",
+    help: "Chance the machine misreads any one letter. Real short-read machines: about 0.1–1%." },
+  { name: "seed", label: "Random seed", min: 0, max: 999, step: 1, def: 42, show: v => v,
+    help: "Start value for the random generator. Same seed = the same mutations and reads every time." },
+  { name: "k", label: "k (word length)", min: 8, max: 32, step: 1, def: 15, show: v => v + " letters",
+    help: "Length of each word (k-mer). Short words repeat more often in the genome, so reads get more candidate starts." },
+  { name: "w", label: "w (window size)", min: 1, max: 40, step: 1, def: 10, show: v => v + " k-mers",
+    help: "How many consecutive k-mers each window covers; one word is kept per window. Bigger w = fewer words kept." },
+  { name: "max_edit", label: "Edit limit (stage 7)", min: 0, max: 10, step: 1, def: 3, show: v => v + " edits",
+    help: "A read is placed only if it differs from the reference by at most this many letter edits." },
+  { name: "min_depth", label: "Min depth (stage 8)", min: 1, max: 20, step: 1, def: 3, show: v => v + " reads",
+    help: "A mutation is called only where at least this many placed reads cover the position." },
 ];
 const PRESETS = {
-  default: { mutations: 20, coverage: 30, error_rate: 1, seed: 42, min_depth: 3, max_edit: 3 },
-  hard: { mutations: 50, coverage: 10, error_rate: 2, seed: 7, min_depth: 3, max_edit: 3 },
-  loose: { mutations: 20, coverage: 30, error_rate: 2, seed: 42, min_depth: 3, max_edit: 6 },
-  depth1: { mutations: 20, coverage: 3, error_rate: 1, seed: 42, min_depth: 1, max_edit: 3 },
+  default: { mutations: 20, coverage: 30, error_rate: 1, seed: 42, k: 15, w: 10, max_edit: 3, min_depth: 3 },
+  hard: { mutations: 50, coverage: 10, error_rate: 2, seed: 7, k: 15, w: 10, max_edit: 3, min_depth: 3 },
+  loose: { mutations: 20, coverage: 30, error_rate: 2, seed: 42, k: 15, w: 10, max_edit: 6, min_depth: 3 },
+  depth1: { mutations: 20, coverage: 3, error_rate: 1, seed: 42, k: 15, w: 10, max_edit: 3, min_depth: 1 },
+  noisy: { mutations: 20, coverage: 30, error_rate: 10, seed: 42, k: 15, w: 10, max_edit: 3, min_depth: 3 },
+  smallk: { mutations: 20, coverage: 30, error_rate: 1, seed: 42, k: 10, w: 5, max_edit: 3, min_depth: 3 },
 };
+$("sliders").innerHTML = SETTINGS.map(s => `<div class="sl"><label for="set_${s.name}">${s.label}<output id="out_${s.name}"></output></label>
+  <input type="range" id="set_${s.name}" min="${s.min}" max="${s.max}" step="${s.step}" value="${s.def}"><p>${s.help}</p></div>`).join("");
+const paint = s => { $("out_" + s.name).textContent = s.show($("set_" + s.name).value); };
+SETTINGS.forEach(s => { paint(s); $("set_" + s.name).oninput = () => paint(s); $("set_" + s.name).onchange = () => run(-1); });
+document.querySelectorAll("[data-preset]").forEach(b => b.onclick = () => {
+  SETTINGS.forEach(s => { $("set_" + s.name).value = PRESETS[b.dataset.preset][s.name]; paint(s); });
+  run(-1);
+});
+const query = () => SETTINGS.map(s => {
+  let v = +$("set_" + s.name).value; if (s.name === "error_rate") v /= 100;
+  return `&${s.name}=${v}`;
+}).join("");
 
-/* Draws one number box per setting. */
-function drawSettings() {
-  $("settingInputs").innerHTML = SETTINGS.map(([name, label, def, min, max, step]) =>
-    `<label>${label}<input type="number" id="set_${name}" value="${def}" min="${min}" max="${max}" step="${step}" required></label>`).join("");
-}
-
-/* Fills the boxes from a preset and runs the pipeline. */
-function preset(name) {
-  Object.entries(PRESETS[name]).forEach(([k, v]) => { $("set_" + k).value = v; });
-  load(-1);
-}
-
-/* Current settings as a query string (error rate is typed in percent, sent as a fraction). */
-function settingsQuery() {
-  return SETTINGS.map(([name]) => {
-    let v = Number($("set_" + name).value);
-    if (name === "error_rate") v = v / 100;
-    return `&${name}=${encodeURIComponent(v)}`;
-  }).join("");
-}
-
-/* Runs the C pipeline on the local server for one read with the current settings, then redraws. */
-async function load(read) {
-  if (!$("settings").reportValidity()) return;
-  $("main").innerHTML = "<p>Running the C pipeline ...</p>";
-  $("status").textContent = "running ...";
-  const t0 = performance.now();
+/* ================= running the C pipeline ================= */
+let runId = 0, IDX = null, BITS = null;
+async function run(read) {
+  const id = ++runId, t0 = performance.now();
+  $("status").className = "busy"; $("status").textContent = "running the C pipeline …";
   try {
-    const r = await fetch("/api/trace?read=" + read + settingsQuery());
+    const r = await fetch("/api/trace?read=" + read + query());
     const data = await r.json();
     if (data.error) throw new Error(data.error);
-    D = data; s7pos = null; s8sel = null;
-    $("status").textContent = `ran ${fmt(D.summary.reads)} reads in ${((performance.now() - t0) / 1000).toFixed(2)} s`;
-    drawHeader(); drawNav(); draw();
+    if (id !== runId) return;
+    D = data; stopAnim();
+    /* Index: bucket -> chain of entries; Bloom: bytes from hex. */
+    IDX = { chains: new Map() };
+    D.index.forEach(([b, word, pos]) => { if (!IDX.chains.has(b)) IDX.chains.set(b, []); IDX.chains.get(b).push({ word, pos }); });
+    BITS = new Uint8Array(D.bloom.hex.length / 2);
+    for (let i = 0; i < BITS.length; i++) BITS[i] = parseInt(D.bloom.hex.substr(i * 2, 2), 16);
+    sel.word = Math.max(0, D.words.findIndex(w => changedIn(w.pos).length === 0));
+    $("status").className = ""; $("status").textContent = `${fmt(D.summary.reads)} reads processed in ${((performance.now() - t0) / 1000).toFixed(2)} s`;
+    drawResults(); drawPicker(); openStage(stage);
+    if (read === -1) { mi = 0; view.c = D.stage9.genome.length / 2; view.s = D.stage9.genome.length; renderScope(); }
   } catch (e) {
-    $("status").textContent = "";
-    $("main").innerHTML = `<div class="err-box">Could not run the pipeline.\n\n${esc(e.message)}\n\nIs the server running? Start it with: python web/server.py</div>`;
+    $("status").className = ""; $("status").textContent = "could not run";
+    $("stage").innerHTML = `<div class="err-box">Could not run the pipeline.\n\n${esc(e.message)}\n\nStart the server with: python web/server.py</div>`;
   }
 }
+const bitAt = i => (BITS[i >> 3] >> (i & 7)) & 1;
 
-/* Header chips and the read picker. */
-function drawHeader() {
-  const s = D.summary, st = D.settings;
-  $("chips").innerHTML = [
-    `Reference <b>${fmt(s.ref_len)}</b> letters`,
-    `<b>${st.mutations}</b> planted, <b>${st.coverage}x</b>, <b>${(st.error_rate*100).toFixed(1)}%</b> errors, seed ${st.seed}`,
-    `min depth <b>${st.min_depth}</b>, edit limit <b>${st.max_edit}</b>`,
-    `Reads placed <b>${fmt(s.placed)}</b> / ${fmt(s.reads)}`,
-    `TP <b>${s.tp}</b> FP <b>${s.fp}</b> FN <b>${s.fn}</b>`,
-  ].map(t => `<span class="chip">${t}</span>`).join("");
-  const sel = $("readSel"), cur = D.read.index, I = D.interesting;
-  const opt = (i, tag) => `<option value="${i}" ${i === cur ? "selected" : ""}>Read #${i}${tag}</option>`;
-  let h = `<optgroup label="Reads over a planted mutation">${I.covers_mutation.map(i => opt(i, "")).join("")}</optgroup>`;
-  h += `<optgroup label="Reads not placed">${I.not_placed.map(i => opt(i, " (not placed)")).join("")}</optgroup>`;
-  if (!I.covers_mutation.includes(cur) && !I.not_placed.includes(cur)) h = opt(cur, "") + h;
-  sel.innerHTML = h;
-}
+/* ================= whole-genome results ================= */
+const scope = $("scope"), sx = scope.getContext("2d");
+const view = { c: 15000, s: 29903 };
+let mi = 0, tween = null;
 
-/* Left-hand list of stages. */
-function drawNav() {
-  $("nav").innerHTML = STAGES.map((s, i) =>
-    `<button class="${i === stage ? "on" : ""}" onclick="go(${i})">${i + 1}. ${s[0]}<small>${s[1]}</small></button>`).join("");
-}
-
-/* Moves to stage i and redraws. */
-function go(i) {
-  stage = Math.max(0, Math.min(STAGES.length - 1, i));
-  drawNav(); draw(); window.scrollTo(0, 0);
-}
-
-/* Draws the current stage's panel. */
-function draw() {
-  const f = [stage1, stage2, stage3, stage4, stage5, stage6, stage7, stage8, stage9][stage];
-  $("main").innerHTML = `<h2>Stage ${stage + 1}: ${STAGES[stage][0]}</h2><div class="ds">Data structure: ${STAGES[stage][1]}</div>` + f();
-  $("prev").disabled = stage === 0;
-  $("next").disabled = stage === STAGES.length - 1;
-  if (stage === 1) hookWindowSlider();
-}
-
-/* One coloured letter tile. extra = extra CSS classes. */
-const tile = (ch, extra = "", title = "") => `<span class="b ${ch} ${extra}" title="${title}">${ch}</span>`;
-
-/* Rows of letter tiles, `per` letters per row, with a classes(i) callback for markers. */
-function tiles(str, per, classes, offset = 0, label = null) {
-  let h = "";
-  for (let a = 0; a < str.length; a += per) {
-    h += `<div class="row"><span class="lbl">${label ? label : fmt(offset + a)}</span>`;
-    for (let i = a; i < Math.min(str.length, a + per); i++) h += tile(str[i], classes ? classes(i) : "", `offset ${i}`);
-    h += "</div>";
+/* Static 3D double helix: strand 1 letters from letterAt, strand 2 complementary; back half drawn fainter. */
+function drawHelix(ctx, o) {
+  const pts = [];
+  for (let k = 0; k < o.n; k++) {
+    const x = o.x0 + (o.x1 - o.x0) * (o.n === 1 ? .5 : k / (o.n - 1)), a = k * o.twist;
+    pts.push({ x, y1: o.cy + o.R * Math.sin(a), z1: Math.cos(a), y2: o.cy - o.R * Math.sin(a), z2: -Math.cos(a), ch: o.letters[k] });
   }
-  return `<div class="seq">${h}</div>`;
-}
-
-const legendLetters = `<i style="background:var(--A)"></i>A <i style="background:var(--C)"></i>C <i style="background:var(--G)"></i>G <i style="background:var(--T)"></i>T`;
-
-/* Stage 1: the read as letters, then as packed 2-bit codes. */
-function stage1() {
-  const r = D.read, mut = new Set(r.mutations), err = new Set(r.errors);
-  const bits = r.packed_bytes.map((b, i) => {
-    const four = r.letters.slice(i * 4, i * 4 + 4).split("");
-    const pairs = four.map(ch => L.indexOf(ch).toString(2).padStart(2, "0"));
-    return `<tr><td class="mono">${four.map(c => tile(c)).join("")}</td><td class="mono">${pairs.join(" ")}</td><td class="mono">${b}</td></tr>`;
-  }).join("");
-  const placed = r.placed_start >= 0 ? `placed by the pipeline at <b>${fmt(r.placed_start)}</b>` : `<b>not placed</b> by the pipeline`;
-  return `<div class="explain">
-    <p>Read <b>#${r.index}</b> is ${r.letters.length} letters cut from the sample genome at position <b>${fmt(r.true_start)}</b> (${placed}).
-    The sample differs from the reference at the planted mutations; the sequencer also made random errors.</p>
-    <p>This read covers <b>${r.mutations.length}</b> planted mutation(s) and has <b>${r.errors.length}</b> sequencing error(s).
-    Each letter is stored in 2 bits: A=00, C=01, G=10, T=11, four letters per byte.</p></div>
-    <div class="card"><h3>The read</h3>${tiles(r.letters, 50, i => (mut.has(i) ? "mut " : "") + (err.has(i) ? "err" : ""))}
-    <div class="legend"><span>${legendLetters}</span><span><i style="outline:3px solid var(--mut);outline-offset:-2px"></i>planted mutation</span><span><i style="background:#888;box-shadow:inset 0 -4px 0 rgba(0,0,0,.5)"></i>sequencing error</span></div></div>
-    <div class="card"><h3>First bytes of the packed array</h3><table><tr><th>4 letters</th><th>2-bit codes</th><th>byte value</th></tr>${bits}</table>
-    <p class="ds" style="margin:8px 0 0">The reference is packed the same way: ${fmt(D.summary.ref_len)} letters in ${fmt(Math.ceil(D.summary.ref_len / 4))} bytes, ${D.summary.ref_nruns} N runs.</p></div>`;
-}
-
-/* Hash as a 0..1 fraction from its first 8 hex digits (for bar heights). */
-const hfrac = h => parseInt(h.slice(0, 8), 16) / 4294967296;
-
-/* Stage 2: every k-mer's hash as a bar, kept minimizers highlighted, with a window slider. */
-function stage2() {
-  const s2 = D.stage2, k = D.settings.k, w = D.settings.w;
-  const kept = new Set(s2.minimizers);
-  return `<div class="explain">
-    <p>Every ${k}-letter word (k-mer) in the read gets a hash. A window slides over <b>${w}</b> consecutive k-mers and keeps the one with the
-    <b>smallest hash</b>. Neighbouring windows often pick the same k-mer, so only <b>${s2.minimizers.length}</b> of the <b>${s2.kmers.length}</b>
-    k-mers are kept. The reference was reduced the same way to <b>${fmt(D.summary.ref_minimizers)}</b> kept words.</p>
-    <p>Drag the slider to move the window. Shorter bar = smaller hash.</p></div>
-    <div class="card"><h3>Hash of each k-mer (by start offset in the read)</h3>
-    <div id="hashChart"></div>
-    <input type="range" id="win" min="0" max="${Math.max(0, s2.kmers.length - w)}" value="0">
-    <div id="winInfo" class="ds"></div>
-    <div class="legend"><span><i style="background:var(--accent)"></i>kept minimizer</span><span><i style="background:var(--line)"></i>not kept</span><span><i style="background:var(--fp)"></i>smallest in the current window</span></div></div>`;
-}
-
-/* Redraws the stage 2 bar chart for the window starting at k-mer index wi. */
-function drawHashChart(wi) {
-  const s2 = D.stage2, w = D.settings.w, n = s2.kmers.length, kept = new Set(s2.minimizers);
-  const bw = 6, H = 160, W = n * bw;
-  let min = wi;
-  for (let i = wi; i < Math.min(n, wi + w); i++) if (s2.kmers[i].hash < s2.kmers[min].hash) min = i;
-  let svg = `<svg width="${W}" height="${H + 20}" viewBox="0 0 ${W} ${H + 20}">`;
-  svg += `<rect x="${wi * bw}" y="0" width="${w * bw}" height="${H}" fill="var(--soft)"/>`;
-  s2.kmers.forEach((km, i) => {
-    const h = Math.max(2, hfrac(km.hash) * (H - 6));
-    const col = i === min ? "var(--fp)" : kept.has(km.pos) ? "var(--accent)" : "var(--line)";
-    svg += `<rect x="${i * bw + 1}" y="${H - h}" width="${bw - 2}" height="${h}" fill="${col}"><title>k-mer at ${km.pos}, hash ${km.hash}</title></rect>`;
+  const strands = front => {
+    for (const s of [1, 2]) for (let k = 0; k + 1 < pts.length; k++) {
+      const z = (pts[k]["z" + s] + pts[k + 1]["z" + s]) / 2;
+      if ((z >= 0) !== front) continue;
+      ctx.strokeStyle = front ? "#17191e" : "#a7a59d"; ctx.lineWidth = front ? 2.2 : 1.4;
+      ctx.beginPath(); ctx.moveTo(pts[k].x, pts[k]["y" + s]); ctx.lineTo(pts[k + 1].x, pts[k + 1]["y" + s]); ctx.stroke();
+    }
+  };
+  strands(false);
+  pts.forEach((p, k) => {
+    if (!p.ch) return;
+    const my = (p.y1 + p.y2) / 2;
+    if (k === o.highlight) { ctx.fillStyle = "#ffd84a"; ctx.fillRect(p.x - 9, Math.min(p.y1, p.y2) - 14, 18, Math.abs(p.y1 - p.y2) + 28); }
+    ctx.lineWidth = k === o.highlight ? 5 : 2.4;
+    ctx.strokeStyle = COL[p.ch]; ctx.beginPath(); ctx.moveTo(p.x, p.y1); ctx.lineTo(p.x, my); ctx.stroke();
+    ctx.strokeStyle = COL[COMP[p.ch]]; ctx.beginPath(); ctx.moveTo(p.x, my); ctx.lineTo(p.x, p.y2); ctx.stroke();
   });
-  for (let t = 0; t < n; t += 25) svg += `<text x="${t * bw}" y="${H + 14}" font-size="10" fill="var(--muted)">${t}</text>`;
-  $("hashChart").innerHTML = svg + "</svg>";
-  const p = s2.kmers[min].pos, word = D.read.letters.slice(p, p + D.settings.k);
-  $("winInfo").innerHTML = `Window of k-mers ${wi} to ${Math.min(n, wi + w) - 1}: smallest hash is the k-mer at offset <b>${p}</b> <span class="mono">${word}</span> (hash <span class="mono">${s2.kmers[min].hash}</span>) ${kept.has(p) ? '<span class="tag ok">kept</span>' : ""}`;
+  strands(true);
+  return pts;
 }
 
-/* Connects the stage 2 slider after the panel is drawn. */
-function hookWindowSlider() {
-  const r = $("win");
-  r.oninput = () => drawHashChart(+r.value);
-  drawHashChart(0);
+/* Draws the microscope for the current view (only when something changes). */
+function renderScope() {
+  const dpr = devicePixelRatio || 1, W = scope.clientWidth, H = scope.clientHeight;
+  if (scope.width !== W * dpr || scope.height !== H * dpr) { scope.width = W * dpr; scope.height = H * dpr; }
+  sx.setTransform(dpr, 0, 0, dpr, 0, 0); sx.fillStyle = "#f7f6f2"; sx.fillRect(0, 0, W, H);
+  if (!D) return;
+  const g = D.stage9.genome, len = g.length, key = D.stage9.key, focus = key[mi];
+  const n = Math.round(Math.max(12, Math.min(110, view.s))), bin = view.s / n, from = view.c - view.s / 2;
+  const mut = new Map(key.map(m => [m.pos, m]));
+  let hi = -1;
+  const letters = [];
+  for (let k = 0; k < n; k++) {
+    const p0 = Math.floor(from + k * bin), p1 = Math.max(p0 + 1, Math.floor(from + (k + 1) * bin));
+    if (p1 <= 0 || p0 >= len) { letters.push(null); continue; }
+    if (focus && focus.pos >= p0 && focus.pos < p1) { hi = k; letters.push(focus.alt); continue; }
+    const p = Math.max(0, Math.min(len - 1, Math.floor(from + (k + .5) * bin)));
+    letters.push(mut.has(p) ? mut.get(p).alt : g[p]);
+  }
+  const close = view.s <= 60, cy = H * .42, R = close ? 70 : 56;
+  const pts = drawHelix(sx, { x0: 26, x1: W - 26, cy, R, n, twist: 2 * Math.PI / (close ? 10.5 : 13), letters, highlight: hi });
+  if (close) {
+    sx.font = "600 11px 'IBM Plex Mono', monospace"; sx.textAlign = "center"; sx.textBaseline = "middle";
+    pts.forEach(p => { if (!p.ch) return;
+      if (p.z1 > -.3) { sx.fillStyle = "#17191e"; sx.fillText(p.ch, p.x, p.y1 + (p.y1 < cy ? -11 : 11)); }
+      if (p.z2 > -.3) { sx.fillStyle = "#17191e"; sx.fillText(COMP[p.ch], p.x, p.y2 + (p.y2 < cy ? -11 : 11)); } });
+  }
+  if (hi >= 0) {
+    const p = pts[hi], txt = `planted mutation ${mi + 1}: ${focus.ref} → ${focus.alt} at ${fmt(focus.pos + 1)}`;
+    sx.font = "600 13px 'IBM Plex Sans', sans-serif"; sx.textAlign = "center"; sx.textBaseline = "middle";
+    const tw = sx.measureText(txt).width + 16, bx = Math.max(tw / 2 + 4, Math.min(W - tw / 2 - 4, p.x));
+    sx.fillStyle = "#ffd84a"; sx.fillRect(bx - tw / 2, 6, tw, 22); sx.strokeStyle = "#17191e"; sx.lineWidth = 1; sx.strokeRect(bx - tw / 2, 6, tw, 22);
+    sx.fillStyle = "#17191e"; sx.fillText(txt, bx, 17);
+  }
+  /* Ruler with every planted mutation and the visible window. */
+  const ry = H - 34, x0 = 26, rw = W - 52;
+  sx.fillStyle = "#e4e2db"; sx.fillRect(x0, ry, rw, 8);
+  const called = new Map(D.stage9.calls.map(c => [c.pos, c]));
+  key.forEach((m, i) => { const ok = called.get(m.pos)?.tp; sx.fillStyle = ok ? "#1e9a58" : "#d4373f"; sx.fillRect(x0 + m.pos / len * rw - 1, ry - (i === mi ? 8 : 4), i === mi ? 3 : 2, i === mi ? 24 : 16); });
+  D.stage9.calls.filter(c => !c.tp).forEach(c => { sx.fillStyle = "#b8650a"; sx.fillRect(x0 + c.pos / len * rw - 1, ry - 4, 2, 16); });
+  const a = x0 + Math.max(0, from) / len * rw, b = x0 + Math.min(len, from + view.s) / len * rw;
+  sx.strokeStyle = "#17191e"; sx.lineWidth = 1.5; sx.strokeRect(a, ry - 6, Math.max(2, b - a), 20);
+  sx.fillStyle = "#5d636f"; sx.font = "11.5px 'IBM Plex Sans', sans-serif"; sx.textAlign = "left"; sx.textBaseline = "alphabetic";
+  sx.fillText(`positions ${fmt(Math.max(1, Math.round(from + 1)))}–${fmt(Math.min(len, Math.round(from + view.s)))} · ${fmt(Math.round(view.s))} bases in view${close ? " · letters on both strands" : " · each rung stands for a stretch"}`, x0, ry + 26);
+}
+/* Smooth move to centre c, span s; zooms out on the way when far. Runs only when called from a click. */
+function flyTo(c, s, ms = 1400) {
+  const c0 = view.c, s0 = view.s, far = Math.abs(c - c0);
+  const bump = Math.max(0, Math.log(Math.max(s0, s, Math.min(30000, far * 2.5))) - Math.max(Math.log(s0), Math.log(s)));
+  const t0 = performance.now(), my = ++tween;
+  (function step(t) {
+    if (my !== tween) return;
+    const k = Math.min(1, (t - t0) / ms), e = ease(k);
+    view.c = c0 + (c - c0) * e;
+    view.s = Math.exp(Math.log(s0) + (Math.log(s) - Math.log(s0)) * e + bump * Math.sin(Math.PI * e));
+    renderScope();
+    if (k < 1) requestAnimationFrame(step);
+  })(t0);
+}
+tween = 0;
+scope.addEventListener("wheel", e => {
+  if (!D) return; e.preventDefault(); tween++;
+  const r = scope.getBoundingClientRect(), fx = (e.clientX - r.left - 26) / (r.width - 52), at = view.c - view.s / 2 + fx * view.s;
+  view.s = Math.max(24, Math.min(D.stage9.genome.length, view.s * Math.pow(1.0018, e.deltaY)));
+  view.c = at - (fx - .5) * view.s; renderScope();
+}, { passive: false });
+let drag = null;
+scope.addEventListener("pointerdown", e => {
+  if (!D) return;
+  const r = scope.getBoundingClientRect();
+  if (e.clientY - r.top > r.height - 46) { flyTo(Math.max(0, Math.min(1, (e.clientX - r.left - 26) / (r.width - 52))) * D.stage9.genome.length, Math.max(view.s, 300)); return; }
+  tween++; drag = { x: e.clientX, c: view.c }; scope.setPointerCapture(e.pointerId);
+});
+scope.addEventListener("pointermove", e => { if (drag) { view.c = drag.c - (e.clientX - drag.x) * view.s / (scope.clientWidth - 52); renderScope(); } });
+scope.addEventListener("pointerup", () => { drag = null; });
+addEventListener("resize", () => renderScope());
+function focusMut(i) {
+  const key = D.stage9.key; if (!key.length) return;
+  mi = (i + key.length) % key.length; flyTo(key[mi].pos + .5, 32);
+  document.querySelectorAll("#mutTable tr[data-i]").forEach(tr => tr.classList.toggle("on", +tr.dataset.i === mi));
+}
+$("mPrev").onclick = () => focusMut(mi - 1);
+$("mNext").onclick = () => focusMut(mi + 1);
+$("zoomOut").onclick = () => D && flyTo(D.stage9.genome.length / 2, D.stage9.genome.length);
+
+/* Score line, every planted mutation and false call, and the per-stage funnel. */
+function drawResults() {
+  const s = D.summary, st = D.settings;
+  $("scoreLine").innerHTML = `<b>${s.tp}</b> of <b>${st.mutations}</b> planted mutations found · <b>${s.fp}</b> false calls · <b>${s.fn}</b> missed · precision ${s.precision}% · recall ${s.recall_all}%`;
+  const called = new Map(D.stage9.calls.map(c => [c.pos, c]));
+  let h = `<table><tr><th>#</th><th>position</th><th>change</th><th>reads over it</th><th>reads with new letter</th><th>result</th></tr>`;
+  D.stage9.key.forEach((m, i) => {
+    const c = called.get(m.pos), ok = c && c.tp;
+    h += `<tr class="click" data-i="${i}"><td>${i + 1}</td><td class="mono">${fmt(m.pos + 1)}</td><td class="mono">${m.ref} → ${m.alt}</td><td>${m.depth}</td><td>${m.counts[L.indexOf(m.alt)]}</td><td>${ok ? '<span class="tag tp">found</span>' : '<span class="tag fn">missed</span>'}</td></tr>`;
+  });
+  D.stage9.calls.filter(c => !c.tp).forEach(c => { h += `<tr><td>–</td><td class="mono">${fmt(c.pos + 1)}</td><td class="mono">${c.ref} → ${c.alt}</td><td>${c.depth}</td><td>${c.alt_count}</td><td><span class="tag fp">false call</span></td></tr>`; });
+  $("mutTable").innerHTML = h + "</table>";
+  document.querySelectorAll("#mutTable tr[data-i]").forEach(tr => tr.onclick = () => focusMut(+tr.dataset.i));
+  const items = [[s.reads, "reads simulated", `${st.coverage}x, ${(st.error_rate * 100).toFixed(1)}% errors`, 0], [s.words, "minimizer words", `from all reads (k=${st.k}, w=${st.w})`, 1],
+    [s.lookups, "passed Bloom", `${fmt(s.bloom_skipped)} skipped`, 3], [s.votes, "votes cast", `${fmt(s.lookups - s.votes)} Bloom false alarms`, 4],
+    [s.placed, "reads placed", `${fmt(s.unplaced)} rejected by verify`, 6], [s.calls, "mutations called", `min depth ${st.min_depth}`, 7], [s.tp, "correct calls", `${s.fp} false, ${s.fn} missed`, 8]];
+  $("funnel").innerHTML = items.map(([v, l, sub, go]) => `<div data-go="${go}"><b>${fmt(v)}</b>${l}<small>${sub}</small></div>`).join("");
+  document.querySelectorAll("#funnel div").forEach(d => d.onclick = () => { openStage(+d.dataset.go); $("explorer").scrollIntoView({ behavior: "smooth" }); });
 }
 
-/* Returns the planted-mutation / error offsets that a word at pos covers. */
+/* ================= read picker ================= */
+function drawPicker() {
+  const I = D.interesting, cur = D.read.index;
+  const o = (i, t) => `<option value="${i}" ${i === cur ? "selected" : ""}>read #${i}${t}</option>`;
+  let h = "";
+  const all = [...I.covers_mutation, ...I.multi_candidate, ...I.not_placed];
+  if (!all.includes(cur)) h += o(cur, "");
+  h += `<optgroup label="reads lying over a planted mutation">${I.covers_mutation.map(i => o(i, "")).join("")}</optgroup>`;
+  if (I.multi_candidate.length) h += `<optgroup label="reads with 2+ candidate starts (repeats)">${I.multi_candidate.map(i => o(i, " · several starts")).join("")}</optgroup>`;
+  if (I.not_placed.length) h += `<optgroup label="reads that were not placed">${I.not_placed.map(i => o(i, " · rejected")).join("")}</optgroup>`;
+  $("readSel").innerHTML = h;
+  const r = D.read;
+  $("readFrame").textContent = `The pipeline already ran on all ${fmt(D.summary.reads)} reads. Stages 1–7 work on one read at a time, so pick any read to see what they did to it. Stages 8–9 combine every read.`;
+  $("readHint").textContent = `read #${r.index}: cut from position ${fmt(r.true_start)}, ${r.placed_start >= 0 ? "placed at " + fmt(r.placed_start) : "not placed"} · ${r.mutations.length} mutation(s), ${r.errors.length} error(s) inside · ${D.stage6.sorted.length} candidate start(s)`;
+}
+$("readSel").onchange = e => run(+e.target.value);
+
+/* ================= stage framework ================= */
+const STAGES = [
+  ["Load", "2-bit packed array · N-run list"], ["Minimizers", "monotonic deque · output array"], ["Index lookup", "hash table with chaining"],
+  ["Bloom filter", "bit array"], ["Vote", "binary search tree"], ["Top 3", "min-heap (array of 3)"],
+  ["Verify", "banded DP table"], ["Pile-up", "counting array · difference array"], ["Score", "sorted array · binary search"],
+];
+$("tabs").innerHTML = STAGES.map((s, i) => `<button class="tab" data-i="${i}">${i + 1} ${s[0]}</button>`).join("");
+document.querySelectorAll(".tab").forEach(t => t.onclick = () => openStage(+t.dataset.i));
+const V = [];
+function openStage(i) {
+  stopAnim(); stage = i;
+  document.querySelectorAll(".tab").forEach((t, k) => t.classList.toggle("on", k === i));
+  if (!D) return;
+  $("sTitle").textContent = `Stage ${i + 1}: ${STAGES[i][0]}`; $("sDS").textContent = STAGES[i][1];
+  $("sWhat").innerHTML = V[i].what();
+  $("stage").innerHTML = V[i].html();
+  V[i].mount && V[i].mount();
+}
+document.addEventListener("keydown", e => {
+  if (["INPUT", "SELECT"].includes(e.target.tagName)) return;
+  if (e.key === "ArrowRight" && stage < 8) openStage(stage + 1);
+  if (e.key === "ArrowLeft" && stage > 0) openStage(stage - 1);
+});
 function changedIn(pos) {
   const k = D.settings.k, r = D.read, out = [];
-  r.mutations.forEach(m => { if (m >= pos && m < pos + k) out.push("mutation @" + m); });
-  r.errors.forEach(e => { if (e >= pos && e < pos + k) out.push("error @" + e); });
+  r.mutations.forEach(m => { if (m >= pos && m < pos + k) out.push("mutation at " + m); });
+  r.errors.forEach(e => { if (e >= pos && e < pos + k) out.push("error at " + e); });
   return out;
 }
-
-/* Stage 3: index lookups for the words that passed the Bloom filter. */
-function stage3() {
-  const s = D.summary, ws = D.words.filter(w => w.looked_up);
-  const rows = ws.map(w => `<tr><td>${w.pos}</td><td class="mono">${w.word}</td><td class="mono">${w.hash.slice(0, 8)}…</td>
-    <td>${fmt(w.bucket)}</td><td>${w.probes}</td><td>${w.ref_positions.length ? w.ref_positions.map(fmt).join(", ") : '<span class="tag mid">not in index</span>'}</td></tr>`).join("");
-  return `<div class="explain">
-    <p>Before any read is processed, the reference's ${fmt(s.ref_minimizers)} kept words were stored in a hash table with
-    <b>${fmt(s.nbuckets)}</b> buckets (${fmt(s.index_entries)} distinct words). Each bucket holds a linked list (a chain) of words; each word holds a
-    linked list of every reference position where it occurs.</p>
-    <p>For a read word: bucket = hash mod ${fmt(s.nbuckets)}, then walk the chain comparing hash and word until it matches.
-    <b>Probes</b> = how many chain entries were checked. Only the ${ws.length} words that passed the Bloom filter (stage 4) are looked up.</p></div>
-    <div class="card"><h3>Lookups for read #${D.read.index}</h3><table><tr><th>read offset</th><th>word</th><th>hash</th><th>bucket</th><th>probes</th><th>reference positions</th></tr>${rows}</table></div>`;
+/* A list of the read's minimizers to pick from; the chosen one is followed through stages 2-5. */
+function wordPicker(id, extra) {
+  return `<div class="cells" id="${id}">${D.words.map((w, i) => `<span class="cell ${i === sel.word ? "on" : ""} ${extra ? extra(w) : ""}" data-i="${i}" title="${w.word}">@${w.pos}</span>`).join("")}</div>`;
+}
+function hookPicker(id, onPick) {
+  document.querySelectorAll(`#${id} .cell`).forEach(c => c.onclick = () => { stopAnim(); sel.word = +c.dataset.i; document.querySelectorAll(`#${id} .cell`).forEach(x => x.classList.toggle("on", x === c)); onPick(); });
 }
 
-/* Stage 4: which read words the Bloom filter let through. */
-function stage4() {
-  const s = D.summary, ws = D.words, skipped = ws.filter(w => !w.bloom).length;
-  const rows = ws.map(w => {
-    const ch = changedIn(w.pos);
-    const res = w.bloom ? (w.ref_positions.length ? '<span class="tag ok">maybe → found</span>' : '<span class="tag mid">maybe → false positive</span>')
-                        : '<span class="tag no">definitely absent</span>';
-    return `<tr><td>${w.pos}</td><td class="mono">${w.word}</td><td>${res}</td><td>${ch.length ? ch.join(", ") : '<span class="ds">none</span>'}</td></tr>`;
-  }).join("");
-  return `<div class="explain">
-    <p>The Bloom filter is a bit array of <b>${fmt(s.bloom_bits)}</b> bits. Each reference word set <b>${s.bloom_hashes}</b> bits. To test a read word,
-    check its ${s.bloom_hashes} bits: if any is 0 the word is <b>definitely not</b> in the reference and the index lookup is skipped.
-    If all are 1 it is <b>maybe</b> there (about 1% of absent words slip through).</p>
-    <p>Here <b>${skipped}</b> of ${ws.length} words were skipped. Look at the last column: skipped words contain a planted mutation or a
-    sequencing error, so they are not reference words. Dropping a word is safe: the read is still placed by its other words.</p></div>
-    <div class="card"><h3>Bloom check for each kept word</h3><table><tr><th>read offset</th><th>word</th><th>Bloom result</th><th>changed letters inside the word</th></tr>${rows}</table></div>`;
-}
-
-/* Lays out a BST with in-order x positions and depth y positions; returns an SVG string. */
-function treeSvg(root, best) {
-  const nodes = [], edges = [];
-  let order = 0;
-  (function walk(n, d, parent) {
-    if (!n) return;
-    walk(n.left, d + 1, n);
-    n._x = order++; n._y = d; nodes.push(n);
-    if (parent) edges.push([parent, n]);
-    walk(n.right, d + 1, n);
-  })(root, 0, null);
-  if (!nodes.length) return '<p class="ds">No votes: every word was skipped or not found.</p>';
-  const dx = 90, dy = 70, W = Math.max(300, nodes.length * dx + 40), H = (Math.max(...nodes.map(n => n._y)) + 1) * dy + 20;
-  const X = n => 50 + n._x * dx, Y = n => 36 + n._y * dy;
-  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">`;
-  edges.forEach(([a, b]) => { s += `<line x1="${X(a)}" y1="${Y(a)}" x2="${X(b)}" y2="${Y(b)}" stroke="var(--muted)"/>`; });
-  nodes.forEach(n => {
-    const on = n.start === best;
-    s += `<rect x="${X(n) - 38}" y="${Y(n) - 22}" width="76" height="44" rx="8" fill="${on ? "var(--accent)" : "var(--panel)"}" stroke="${on ? "var(--accent)" : "var(--line)"}"/>`;
-    s += `<text x="${X(n)}" y="${Y(n) - 3}" text-anchor="middle" font-size="13" font-weight="700" fill="${on ? "#fff" : "var(--ink)"}">${fmt(n.start)}</text>`;
-    s += `<text x="${X(n)}" y="${Y(n) + 14}" text-anchor="middle" font-size="11" fill="${on ? "#fff" : "var(--muted)"}">${n.count} vote${n.count > 1 ? "s" : ""}</text>`;
-  });
-  return s + "</svg>";
-}
-
-/* Stage 5: every vote, and the BST they built. */
-function stage5() {
-  const ws = D.words.filter(w => w.votes.length), s5 = D.stage5;
-  const best = D.stage6.sorted.length ? D.stage6.sorted[0][0] : null;
-  const list = ws.map(w => `<tr><td>${w.pos}</td><td>${w.ref_positions.map(fmt).join(", ")}</td><td>${w.votes.map(v => `<b>${fmt(v)}</b>`).join(", ")}</td></tr>`).join("");
-  return `<div class="explain">
-    <p>Each found word votes for where the read would start: <b>start = reference position − read offset</b>.
-    If a word appears in several reference places, it votes for each. Votes are counted in a binary search tree keyed by start:
-    a smaller start goes left, a larger one right, an equal one just adds 1 to that node's count.</p>
-    <p>${ws.length} words cast votes, giving <b>${s5.nodes}</b> distinct start(s); tree height ${s5.height}.
-    ${best !== null ? `The most votes went to start <b>${fmt(best)}</b>.` : ""}</p></div>
-    <div class="card"><h3>Vote tree</h3>${treeSvg(s5.tree, best)}</div>
-    <div class="card"><h3>Votes</h3><table><tr><th>read offset</th><th>reference position(s)</th><th>vote for start</th></tr>${list}</table></div>`;
-}
-
-/* Small drawing of a 3-slot heap array as a tree (index 0 on top). */
-function heapSvg(heap) {
-  const pos = [[110, 26], [50, 86], [170, 86]];
-  let s = `<svg width="220" height="116" viewBox="0 0 220 116">`;
-  if (heap.length > 1) s += `<line x1="110" y1="26" x2="50" y2="86" stroke="var(--muted)"/>`;
-  if (heap.length > 2) s += `<line x1="110" y1="26" x2="170" y2="86" stroke="var(--muted)"/>`;
-  heap.forEach((c, i) => {
-    const [x, y] = pos[i];
-    s += `<rect x="${x - 40}" y="${y - 20}" width="80" height="40" rx="8" fill="var(--panel)" stroke="${i === 0 ? "var(--fp)" : "var(--line)"}" stroke-width="${i === 0 ? 2 : 1}"/>`;
-    s += `<text x="${x}" y="${y - 2}" text-anchor="middle" font-size="12" font-weight="700" fill="var(--ink)">${fmt(c[0])}</text>`;
-    s += `<text x="${x}" y="${y + 13}" text-anchor="middle" font-size="10" fill="var(--muted)">[${i}] ${c[1]} votes</text>`;
-  });
-  return s + "</svg>";
-}
-
-/* Stage 6: each tree node offered to the size-3 min-heap, in walk order. */
-function stage6() {
-  const s6 = D.stage6;
-  const act = { insert: '<span class="tag info">insert + sift up</span>', replace: '<span class="tag ok">beats root → replace + sift down</span>', discard: '<span class="tag no">not better than root → discard</span>' };
-  const steps = s6.offers.map((o, i) => `<div class="card" style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
-    <div style="min-width:240px"><b>Offer ${i + 1}:</b> start ${fmt(o.start)} with ${o.votes} vote(s)<br>${act[o.action]}
-    ${o.root_before ? `<div class="ds">root before: ${fmt(o.root_before[0])} (${o.root_before[1]} votes)</div>` : ""}</div>${heapSvg(o.heap)}</div>`).join("");
-  return `<div class="explain">
-    <p>An in-order walk of the vote tree offers every (start, votes) pair to a min-heap that holds at most <b>3</b>. The <b>weakest</b> kept
-    candidate sits at the root [0] (fewer votes is weaker; on a tie, the larger start is weaker).</p>
-    <p>While fewer than 3 are kept, a new one is inserted and sifted up. Once full, a newcomer only has to beat the root: if it does, it
-    replaces the root and sifts down; otherwise it is discarded. Here ${s6.offers.length} candidate(s) were offered.</p></div>
-    ${steps || '<p class="ds">No candidates: this read got no votes.</p>'}
-    <div class="card"><h3>Short-list handed to stage 7 (best first)</h3>${s6.sorted.length ? s6.sorted.map((c, i) => `<span class="chip" style="margin-right:6px">${i + 1}. start <b>${fmt(c[0])}</b>, ${c[1]} votes</span>`).join("") : "empty"}</div>`;
-}
-
-/* Builds a small table of the first rows of the DP band (around the diagonal). */
-function dpSmall(dp, read, win, band, rows) {
-  const cols = Math.min(win.length, rows + band);
-  let h = `<table class="dp-small"><tr><td></td><td></td>${win.slice(0, cols).split("").map(c => `<td>${tile(c)}</td>`).join("")}</tr>`;
-  for (let i = 0; i <= rows; i++) {
-    h += `<tr><td>${i ? tile(read[i - 1]) : ""}</td>`;
-    for (let j = 0; j <= cols; j++) {
-      const d = j - i + band, v = d >= 0 && d < 2 * band + 1 ? dp[i][d] : null;
-      h += v === null ? `<td class="inf">${Math.abs(i - j) <= band ? "∞" : ""}</td>` : `<td class="${i === j ? "path" : ""}">${v}</td>`;
-    }
-    h += "</tr>";
-  }
-  return h + "</table>";
-}
-
-/* Heatmap of the whole band: one small square per computed cell. */
-function dpHeat(dp, band, winLen) {
-  const n = dp.length, c = 3, W = (winLen + 1) * c, H = n * c;
-  let max = 1;
-  dp.forEach(r => r.forEach(v => { if (v !== null && v > max) max = v; }));
-  let s = `<svg width="${W}" height="${H}" viewBox="0 0 ${W} ${H}"><rect width="${W}" height="${H}" fill="var(--soft)"/>`;
-  dp.forEach((r, i) => r.forEach((v, d) => {
-    const j = i - band + d;
-    if (v === null || j < 0 || j > winLen) return;
-    const t = Math.min(1, v / Math.max(3, max));
-    s += `<rect x="${j * c}" y="${i * c}" width="${c}" height="${c}" fill="hsl(${130 - 130 * t},65%,${48 - 10 * t}%)"/>`;
-  }));
-  return s + "</svg>";
-}
-
-/* Stage 7: for each candidate, the letter-by-letter comparison and its DP band. */
-function stage7() {
-  const s7 = D.stage7, r = D.read, band = D.settings.band;
-  const cards = s7.candidates.map((c, ci) => {
-    const verdict = c.accepted ? '<span class="tag ok">accepted</span>' : '<span class="tag no">rejected</span>';
-    let body = `<div class="ds">votes ${c.votes} · status ${esc(c.status)} · edit distance <b>${c.distance === null ? "∞" : c.distance}</b> (limit ${D.settings.max_edit})</div>`;
-    if (c.window) {
-      body += `<h3 style="margin-top:12px">Read vs reference window</h3>`;
-      const win = c.window;
-      for (let a = 0; a < r.letters.length; a += 50) {
-        const rr = r.letters.slice(a, a + 50), ww = win.slice(a, a + 50);
-        body += `<div class="seq"><div class="row"><span class="lbl">read ${a}</span>${rr.split("").map((ch, i) => tile(ch, ch !== ww[i] ? "mis" : "dim")).join("")}</div>`;
-        body += `<div class="row" style="margin-bottom:10px"><span class="lbl">ref ${fmt(c.start + a)}</span>${ww.split("").map((ch, i) => tile(ch, ch !== rr[i] ? "mis" : "dim")).join("")}</div></div>`;
+/* ================= STAGE 1: load ================= */
+V[0] = {
+  what: () => `The sequencer gives letters; stage 1 stores each as <b>2 bits</b> (A=00, C=01, G=10, T=11), four per byte, so letter <i>i</i> lives in byte <i>i</i>/4. Any N would be stored as 00 and recorded separately in a sorted list of (start, length) runs. Below, the read is lined up against the reference at the place it came from, so the planted mutation stands out. Click any letter or byte.`,
+  html: () => {
+    const r = D.read, n = r.letters.length;
+    const mut = new Set(r.mutations), err = new Set(r.errors);
+    let h = `<div class="box"><h3>The read lined up against the reference</h3>`;
+    if (!r.mutations.length && !r.errors.length) h += `<p class="hint">This read matches the reference exactly.</p>`;
+    for (let a = 0; a < n; a += 50) {
+      const b = Math.min(n, a + 50);
+      let marks = "";
+      for (let i = a; i < b; i++) {
+        if (mut.has(i)) marks += `<span class="mk" style="left:${(i - a) * 18 + 9}px">MUTATION ${r.ref_letters[i]}→${r.letters[i]}</span>`;
+        else if (err.has(i)) marks += `<span class="mk err" style="left:${(i - a) * 18 + 9}px">error</span>`;
       }
+      const lane = (lbl, s, other) => `<div class="lane"><span class="lbl">${lbl}</span>${s.slice(a, b).split("").map((ch, k) => {
+        const i = a + k, diff = ch !== other[i];
+        return tile(ch, (diff ? "" : "same") + (mut.has(i) ? " mutcol" : ""), `data-i="${i}"`); }).join("")}</div>`;
+      h += `<div style="margin-bottom:10px">${marks ? `<div class="markrow">${marks}</div>` : ""}${lane(`read ${a}–${b - 1}`, r.letters, r.ref_letters)}${lane(`ref ${fmt(r.true_start + a)}`, r.ref_letters, r.letters)}</div>`;
     }
-    if (c.dp) {
-      body += `<h3 style="margin-top:12px">Edit-distance table: first rows</h3><div class="ds">Each cell = fewest edits between the first i read letters and first j window letters. Only cells within ${band} of the diagonal are computed (∞ = outside reach).</div>`;
-      body += dpSmall(c.dp, r.letters, c.window, band, 12);
-      body += `<h3 style="margin-top:12px">Whole band (${r.letters.length + 1} rows)</h3><div class="ds">Green = few edits, red = many. Bottom-right cell = the answer, ${c.distance}.</div>${dpHeat(c.dp, band, c.window.length)}`;
+    h += `<div class="legend"><span><i style="background:#888;opacity:.55"></i>letter matches the reference (faded)</span><span><i style="background:var(--mark)"></i>planted mutation (in every read here)</span><span><i style="background:#fff;border:1px dashed var(--fn)"></i>sequencing error (only in this read)</span></div></div>`;
+    h += `<div class="cols"><div class="box"><h3>Packed array: ${Math.ceil(n / 4)} bytes for ${n} letters</h3><div id="bytes"></div></div>
+      <div class="box sub"><h3>Where is the letter you clicked?</h3><div id="where" class="eq">click a letter or a byte</div>
+      <h3 style="margin-top:12px">N-run list (sorted array of (start, length))</h3><div class="eq">read: [ ] (no N) &nbsp;·&nbsp; reference: ${D.summary.ref_nruns ? D.summary.ref_nruns + " run(s)" : "[ ] (no N in NC_045512.2)"}</div>
+      <p class="hint">Before using a letter, the loader checks this list; any word touching an N is skipped in stage 2.</p>
+      <div class="row-btns"><button class="btn" id="packBtn">Animate packing the selected byte</button></div></div></div>`;
+    return h;
+  },
+  mount: () => {
+    const r = D.read, n = r.letters.length;
+    $("bytes").innerHTML = r.packed_bytes.map((v, b) => {
+      let q = "";
+      for (let k = 0; k < 4; k++) { const i = b * 4 + k; q += i < n ? `<span style="background:${COL[r.letters[i]]}">${L.indexOf(r.letters[i]).toString(2).padStart(2, "0")}</span>` : `<span style="background:#ccc">00</span>`; }
+      return `<span class="byte" data-b="${b}"><span class="q">${q}</span><small>[${b}] = ${v}</small></span>`;
+    }).join("");
+    V[0].pick(r.mutations.length ? r.mutations[0] : 0);
+    document.querySelectorAll("#stage .b[data-i]").forEach(t => t.onclick = () => V[0].pick(+t.dataset.i));
+    document.querySelectorAll("#bytes .byte").forEach(b => b.onclick = () => V[0].pick(+b.dataset.b * 4));
+    $("packBtn").onclick = () => animate(V[0].pack);
+  },
+  cur: 0,
+  pick: i => {
+    stopAnim(); V[0].cur = i;
+    const r = D.read, b = i >> 2, slot = i & 3, shift = 6 - 2 * slot, v = r.packed_bytes[b];
+    document.querySelectorAll("#stage .b[data-i]").forEach(t => t.classList.toggle("sel", (+t.dataset.i >> 2) === b && t.closest(".lane").querySelector(".lbl").textContent.startsWith("read")));
+    document.querySelectorAll("#bytes .byte").forEach(x => x.classList.toggle("on", +x.dataset.b === b));
+    $("where").innerHTML = `letter ${i} = <b>${r.letters[i]}</b> → byte ${i} / 4 = <b>${b}</b>, slot ${i} mod 4 = ${slot}, shift = 6 − 2·${slot} = ${shift}<br>
+      (byte[${b}] = ${v} = ${v.toString(2).padStart(8, "0")}) >> ${shift} &amp; 11 = <b>${((v >> shift) & 3).toString(2).padStart(2, "0")}</b> = ${L[(v >> shift) & 3]}`;
+  },
+  pack: async tok => {
+    const r = D.read, b = V[0].cur >> 2, el = document.querySelector(`#bytes .byte[data-b="${b}"]`), spans = el.querySelectorAll(".q span");
+    spans.forEach(s => s.style.visibility = "hidden");
+    let acc = 0;
+    for (let k = 0; k < 4; k++) {
+      const i = b * 4 + k; if (i >= r.letters.length) break;
+      const code = L.indexOf(r.letters[i]); acc = (acc << 2) | code;
+      $("where").innerHTML = `byte ${b}: shift left 2, OR in ${r.letters[i]} = ${code.toString(2).padStart(2, "0")} → <b>${acc.toString(2).padStart(2 * (k + 1), "0")}</b>`;
+      spans[k].style.visibility = "visible"; await wait(700, tok);
     }
-    return `<div class="card"><h3>Candidate ${ci + 1}: start ${fmt(c.start)} ${verdict}</h3>${body}</div>`;
-  }).join("");
-  return `<div class="explain">
-    <p>Votes only show that some words matched. Stage 7 checks <b>every letter</b>: it compares the read with the reference window that starts at
-    each candidate, counting the fewest substitutions, insertions and deletions needed (edit distance). A candidate is accepted if the distance is at
-    most <b>${D.settings.max_edit}</b>; among accepted ones the smallest distance wins.</p>
-    <p>Result: ${s7.mapped ? `read placed at <b>${fmt(s7.start)}</b>${s7.start === r.true_start ? " (its true start)" : ` (true start ${fmt(r.true_start)})`}.` :
-      `<b>not placed</b>: no candidate was within ${D.settings.max_edit} edits, so this read is left out of the pile-up.`}
-    Mismatched letters are outlined below; this read has ${r.mutations.length} planted mutation(s) and ${r.errors.length} error(s).</p></div>${cards || '<p class="ds">No candidates to verify.</p>'}`;
-}
+    $("where").innerHTML += ` = ${r.packed_bytes[b]} ✓`;
+  },
+};
 
-/* Stage 8: depth and letter counts under this read, with one position's call decision. */
-function stage8() {
-  const s8 = D.stage8, n = s8.depth.length, st = D.settings;
-  const calls = new Set(s8.calls);
-  if (s8sel === null) s8sel = s8.calls.length ? s8.calls[0] : (D.read.mutations[0] ?? 0);
-  const maxD = Math.max(1, ...s8.depth), bw = 6, H = 150, W = n * bw;
-  let svg = `<svg width="${W}" height="${H + 24}" viewBox="0 0 ${W} ${H + 24}">`;
-  s8.depth.forEach((dep, i) => {
-    const ref = L.indexOf(s8.ref_letters[i]), cnt = s8.counts[i];
-    let y = H;
-    const hRef = cnt[ref] / maxD * H;
-    svg += `<rect x="${i * bw + .5}" y="${y - hRef}" width="${bw - 1}" height="${hRef}" fill="var(--line)" onclick="pick8(${i})" style="cursor:pointer"/>`;
-    y -= hRef;
-    [0, 1, 2, 3].forEach(c => {
-      if (c === ref || !cnt[c]) return;
-      const h = cnt[c] / maxD * H;
-      svg += `<rect x="${i * bw + .5}" y="${y - h}" width="${bw - 1}" height="${h}" fill="var(--${L[c]})" onclick="pick8(${i})" style="cursor:pointer"/>`;
-      y -= h;
+/* ================= STAGE 2: minimizers ================= */
+V[1] = {
+  wi: 0,
+  what: () => `Every <b>${D.settings.k}-letter word</b> (k-mer) gets a hash. A window covers <b>${D.settings.w}</b> consecutive k-mers and keeps the one with the <b>smallest hash</b>. The C code keeps the window's candidates in a <b>monotonic deque</b>: hashes increase from front to back, so the front is always the minimum; a new k-mer pushes out every larger one from the back, and the front leaves when it slides out of the window. <b>Drag the window</b> on the chart (or use the arrows) and watch the deque change.`,
+  html: () => `<div class="box"><h3>The read, with the current window (yellow) and its smallest k-mer (black)</h3><div id="w2letters" class="mono"></div></div>
+    <div class="box"><h3>Hash of every k-mer: drag the yellow window</h3><canvas class="cv" id="hc" style="cursor:ew-resize"></canvas>
+    <div class="row-btns" style="margin-top:8px"><button class="btn" id="wl">◀ slide back</button><button class="btn" id="wr">slide forward ▶</button>
+    <button class="btn" id="wplay">Animate the whole slide</button><span class="hint" id="winfo"></span></div></div>
+    <div class="cols"><div class="box sub"><h3>Monotonic deque for this window (front = minimum)</h3><div id="dq"></div><div id="dqlog" class="eq"></div></div>
+    <div class="box"><h3>Output array: minimizers kept so far (click one to follow it)</h3><div id="kept" class="cells"></div></div></div>`,
+  mount: () => {
+    const s2 = D.stage2, w = D.settings.w;
+    V[1].n = s2.kmers.length; V[1].nw = Math.max(1, V[1].n - w + 1);
+    const keptIdx = D.words.findIndex((x, i) => i === sel.word);
+    const p = D.words[keptIdx]?.pos ?? 0;
+    V[1].wi = Math.max(0, Math.min(V[1].nw - 1, p - Math.floor(w / 2)));
+    const cv = $("hc"); let dragging = false;
+    const at = e => { const r = cv.getBoundingClientRect(); return Math.floor((e.clientX - r.left) / V[1].bw); };
+    cv.onpointerdown = e => { stopAnim(); dragging = true; cv.setPointerCapture(e.pointerId); V[1].go(at(e) - Math.floor(w / 2)); };
+    cv.onpointermove = e => { if (dragging) V[1].go(at(e) - Math.floor(w / 2)); };
+    cv.onpointerup = () => { dragging = false; };
+    $("wl").onclick = () => { stopAnim(); V[1].go(V[1].wi - 1, true); };
+    $("wr").onclick = () => { stopAnim(); V[1].go(V[1].wi + 1, true); };
+    $("wplay").onclick = () => animate(async tok => { for (let i = 0; i < V[1].nw; i++) { V[1].go(i, true); await wait(260, tok); } });
+    V[1].go(V[1].wi, false);
+  },
+  hash: i => D.stage2.kmers[i].hash,
+  deque: wi => {                              // indices kept by the monotonic deque after window wi
+    const dq = [], end = Math.min(V[1].n, wi + D.settings.w);
+    for (let j = wi; j < end; j++) { while (dq.length && V[1].hash(dq[dq.length - 1]) > V[1].hash(j)) dq.pop(); dq.push(j); }
+    return dq;
+  },
+  go: (wi, explainStep) => {
+    const s2 = D.stage2, w = D.settings.w, k = D.settings.k, n = V[1].n;
+    wi = Math.max(0, Math.min(V[1].nw - 1, wi));
+    const prev = V[1].wi; V[1].wi = wi;
+    const dq = V[1].deque(wi), min = dq[0];
+    /* chart */
+    const bw = V[1].bw = Math.max(4, Math.min(8, Math.floor(1000 / n))), H = 130, cv = $("hc");
+    cv.width = n * bw; cv.height = H + 16;
+    const x = cv.getContext("2d");
+    x.fillStyle = "#fff3bf"; x.fillRect(wi * bw, 0, Math.min(w, n - wi) * bw, H);
+    x.strokeStyle = "#17191e"; x.strokeRect(wi * bw + .5, .5, Math.min(w, n - wi) * bw - 1, H - 1);
+    const keptSet = new Set();
+    for (let j = 0; j <= wi; j++) keptSet.add(V[1].deque(j)[0]);
+    for (let i = 0; i < n; i++) {
+      const h = Math.max(3, parseInt(s2.kmers[i].hash.slice(0, 8), 16) / 4294967296 * (H - 6));
+      x.fillStyle = i === min ? "#17191e" : dq.includes(i) ? "#8c8a83" : keptSet.has(i) ? "#c9a227" : "#d8d6ce";
+      x.fillRect(i * bw + 1, H - h, bw - 2, h);
+    }
+    x.fillStyle = "#5d636f"; x.font = "10px 'IBM Plex Mono'"; for (let t = 0; t < n; t += 20) x.fillText(t, t * bw, H + 12);
+    $("winfo").textContent = `window ${wi + 1} of ${V[1].nw}: k-mers ${wi}–${Math.min(n, wi + w) - 1}`;
+    /* letters */
+    const r = D.read.letters, span0 = wi, span1 = Math.min(r.length, wi + w - 1 + k);
+    let h = "";
+    for (let a = 0; a < r.length; a += 50) {
+      h += `<div class="lane"><span class="lbl">${a}</span>`;
+      for (let i = a; i < Math.min(r.length, a + 50); i++) h += tile(r[i], (i >= min && i < min + k) ? "minw" : (i >= span0 && i < span1) ? "inwin" : "pale");
+      h += "</div>";
+    }
+    $("w2letters").innerHTML = h;
+    /* deque */
+    const pd = explainStep ? V[1].deque(prev) : dq;
+    const gone = pd.filter(j => !dq.includes(j)), added = dq.filter(j => !pd.includes(j));
+    $("dq").innerHTML = `<div class="dq"><span class="dq-end">front</span>${dq.map((j, t) => `<div class="item ${t === 0 ? "front" : ""} ${added.includes(j) ? "new" : ""}">k-mer ${j}<br>${V[1].hash(j).slice(0, 6)}…</div>`).join("")}${gone.map(j => `<div class="item gone">k-mer ${j}<br>${V[1].hash(j).slice(0, 6)}…</div>`).join("")}<span class="dq-end">back</span></div>`;
+    requestAnimationFrame(() => document.querySelectorAll(".dq .item.new").forEach(e => e.classList.remove("new")));
+    let log = `front = k-mer ${min} (<span style="background:#17191e;color:#fff;padding:0 3px">${r.slice(min, min + k)}</span>) is this window's minimizer`;
+    if (explainStep && prev !== wi) {
+      const parts = [];
+      if (added.length) parts.push(`pushed k-mer ${added.join(", ")} at the back`);
+      const expired = gone.filter(j => j < wi), popped = gone.filter(j => j >= wi);
+      if (popped.length) parts.push(`popped ${popped.join(", ")} (larger hash than the newcomer)`);
+      if (expired.length) parts.push(`${expired.join(", ")} left the window from the front`);
+      if (parts.length) log = parts.join("; ") + ".<br>" + log;
+    }
+    $("dqlog").innerHTML = log;
+    /* output array */
+    const kept = [...keptSet].sort((a, b) => a - b);
+    $("kept").innerHTML = kept.map(j => { const wi2 = D.words.findIndex(x => x.pos === j); return `<span class="cell ${wi2 === sel.word ? "on" : ""}" data-w="${wi2}">[${kept.indexOf(j)}] @${j}</span>`; }).join("")
+      + `<span class="hint" style="align-self:center">${kept.length} of ${D.stage2.minimizers.length} kept by the end</span>`;
+    document.querySelectorAll("#kept .cell").forEach(c => c.onclick = () => { if (+c.dataset.w >= 0) { sel.word = +c.dataset.w; V[1].go(V[1].wi, false); } });
+  },
+};
+
+/* ================= STAGE 3: index ================= */
+V[2] = {
+  bucket: null,
+  what: () => `The reference's ${fmt(D.summary.ref_minimizers)} kept words are stored in a <b>hash table</b> of <b>${fmt(D.summary.nbuckets)} buckets</b>. Each bucket points to a <b>chain</b> (linked list) of distinct words; each word holds a linked list of every reference position where it occurs. To look a read word up: bucket = hash mod ${fmt(D.summary.nbuckets)}, then walk that chain. Click any bucket to open its chain, or pick a read word and animate its lookup.`,
+  html: () => {
+    const lens = [0, 0, 0, 0, 0]; for (let b = 0; b < D.summary.nbuckets; b++) { const c = IDX.chains.get(b)?.length || 0; lens[Math.min(4, c)]++; }
+    return `<div class="box"><h3>Read word to look up (the selected minimizer)</h3>${wordPicker("p3", w => w.looked_up ? "" : "dim")}
+      <div class="eq" id="h3eq"></div><div class="row-btns"><button class="btn solid" id="look">Animate this lookup</button><span class="hint">greyed words were skipped by the Bloom filter, so they are never looked up</span></div></div>
+      <div class="box"><h3>Bucket array: ${fmt(D.summary.nbuckets)} buckets, ${fmt(D.summary.index_entries)} words, load ${(D.summary.index_entries / D.summary.nbuckets).toFixed(2)} words per bucket · click a bucket</h3>
+      <canvas class="cv" id="grid" style="cursor:pointer"></canvas>
+      <div class="legend"><span><i style="background:#fff"></i>empty (${fmt(lens[0])})</span><span><i style="background:#d8d6ce"></i>1 word (${fmt(lens[1])})</span><span><i style="background:#8c8a83"></i>2 words (${fmt(lens[2])})</span><span><i style="background:#17191e"></i>3+ words (${fmt(lens[3] + lens[4])})</span><span><i style="background:#ffd84a"></i>selected bucket</span></div></div>
+      <div class="box sub"><h3 id="chainTitle">Chain</h3><div id="chain" class="chain"></div></div>`;
+  },
+  mount: () => {
+    hookPicker("p3", () => V[2].showWord());
+    $("grid").onclick = e => { const r = $("grid").getBoundingClientRect(), c = V[2].cs, b = Math.floor((e.clientY - r.top) / c) * V[2].cols + Math.floor((e.clientX - r.left) / c);
+      if (b >= 0 && b < D.summary.nbuckets) { stopAnim(); V[2].openBucket(b); } };
+    $("look").onclick = () => animate(V[2].lookup);
+    V[2].showWord();
+  },
+  cols: 120, cs: 7,
+  drawGrid: () => {
+    const nb = D.summary.nbuckets, cols = V[2].cols, c = V[2].cs, cv = $("grid");
+    cv.width = cols * c; cv.height = Math.ceil(nb / cols) * c;
+    const x = cv.getContext("2d"); x.fillStyle = "#e4e2db"; x.fillRect(0, 0, cv.width, cv.height);
+    for (let b = 0; b < nb; b++) {
+      const n = IDX.chains.get(b)?.length || 0;
+      x.fillStyle = b === V[2].bucket ? "#ffd84a" : ["#ffffff", "#d8d6ce", "#8c8a83", "#17191e"][Math.min(3, n)];
+      x.fillRect((b % cols) * c, Math.floor(b / cols) * c, c - 1, c - 1);
+    }
+    if (V[2].bucket !== null) { const b = V[2].bucket; x.strokeStyle = "#17191e"; x.lineWidth = 2; x.strokeRect((b % cols) * c - 3, Math.floor(b / cols) * c - 3, c + 5, c + 5); }
+  },
+  openBucket: (b, mark) => {
+    V[2].bucket = b; V[2].drawGrid();
+    const ch = IDX.chains.get(b) || [];
+    $("chainTitle").textContent = `Chain of bucket ${fmt(b)} (${ch.length} word${ch.length === 1 ? "" : "s"})`;
+    $("chain").innerHTML = `<span class="node" style="background:#17191e;color:#fff">bucket[${fmt(b)}]</span>` +
+      ch.map((e, i) => `<span class="arr">→</span><span class="node ${mark && mark.hit === i ? "hit" : ""} ${mark && mark.cmp === i ? "cmp" : ""}" id="cn${i}">${e.word}<span class="plist">${e.pos.map(p => `<span class="p">${fmt(p)}</span>`).join('<span class="arr">→</span>')}<span class="arr">→ NULL</span></span></span>`).join("") +
+      `<span class="arr">→ NULL</span>`;
+  },
+  showWord: () => {
+    const w = D.words[sel.word], nb = D.summary.nbuckets;
+    const b = Number(BigInt("0x" + w.hash) % BigInt(nb));
+    $("h3eq").innerHTML = `word <b>${w.word}</b> (read offset ${w.pos}) · hash = ${w.hash} · bucket = hash mod ${fmt(nb)} = <b>${fmt(b)}</b>${b !== w.bucket ? " (mismatch!)" : ""}${w.looked_up ? "" : " · <span style='color:var(--fn)'>skipped by Bloom, never looked up</span>"}`;
+    V[2].openBucket(b);
+  },
+  lookup: async tok => {
+    const w = D.words[sel.word], b = w.bucket, ch = IDX.chains.get(b) || [];
+    V[2].bucket = null; V[2].drawGrid(); await wait(300, tok);
+    V[2].openBucket(b); $("chain").querySelectorAll(".node:not(:first-child)").forEach(n => n.classList.add("miss"));
+    await wait(500, tok);
+    for (let i = 0; i < ch.length; i++) {
+      const hit = ch[i].word === w.word;
+      V[2].openBucket(b, { cmp: i, hit: hit ? i : -1 });
+      $("h3eq").innerHTML = `walking the chain: entry ${i + 1} is <b>${ch[i].word}</b> — ${hit ? "same word ✓ → its positions: " + ch[i].pos.map(fmt).join(", ") : "different word ✗, follow next"}`;
+      await wait(900, tok);
+      if (hit) return;
+    }
+    $("h3eq").innerHTML = `reached NULL: <b>${w.word}</b> is not in the reference${w.bloom ? " (the Bloom filter gave a false alarm)" : ""}`;
+  },
+};
+
+/* ================= STAGE 4: Bloom ================= */
+V[3] = {
+  what: () => `The Bloom filter is one <b>bit array</b> of ${fmt(D.bloom.m)} bits. Building it, every reference word switched on <b>${D.bloom.h} bits</b> (positions h1 + i·h2 mod ${fmt(D.bloom.m)}, i = 0…${D.bloom.h - 1}). To test a read word, look at its ${D.bloom.h} bits: if <b>any is 0</b>, the word is definitely not in the reference and the stage 3 lookup is skipped; if <b>all are 1</b>, it is "maybe there". Pick a word and press check. (The bit positions shown are checked against the real C filter: ${D.bloom_display_matches_c ? "they match" : "MISMATCH"}.)`,
+  html: () => {
+    let ones = 0; for (let i = 0; i < D.bloom.m; i++) ones += bitAt(i);
+    return `<div class="box"><h3>Read word to test (words with a planted mutation or error are marked red)</h3>${wordPicker("p4", w => changedIn(w.pos).length ? "no" : "")}
+      <div class="row-btns" style="margin-top:8px"><button class="btn solid" id="chk">Animate the check</button><span class="hint" id="b4res"></span></div></div>
+      <div class="cols"><div class="box sub"><h3>Its ${D.bloom.h} bit positions</h3><table id="bt"></table></div>
+      <div class="box"><h3>Zoom: 40 bits around the probed position</h3><div id="zoomBits" class="cells"></div><div class="eq" id="b4eq"></div></div></div>
+      <div class="box"><h3>Whole bit array: ${fmt(D.bloom.m)} bits, ${fmt(ones)} set (${(ones / D.bloom.m * 100).toFixed(1)}%) · dark = 1, light = 0 · rings = this word's bits</h3><canvas class="cv" id="bits"></canvas>
+      <div class="legend"><span><i style="background:#3d4048"></i>bit = 1</span><span><i style="background:#f1f0eb"></i>bit = 0</span><span><i style="background:#fff;border:2px solid var(--tp)"></i>word's bit is 1 (match)</span><span><i style="background:#fff;border:2px solid var(--fn)"></i>word's bit is 0 (mismatch)</span></div></div>`;
+  },
+  mount: () => { hookPicker("p4", () => V[3].show(-1)); $("chk").onclick = () => animate(V[3].check); V[3].show(-1); },
+  cols: 280, cs: 3,
+  drawBits: probe => {
+    const m = D.bloom.m, cols = V[3].cols, c = V[3].cs, cv = $("bits"), w = D.words[sel.word];
+    cv.width = cols * c; cv.height = Math.ceil(m / cols) * c;
+    const x = cv.getContext("2d"), img = x.createImageData(cv.width, cv.height);
+    for (let i = 0; i < m; i++) {
+      const v = bitAt(i) ? [61, 64, 72] : [241, 240, 235], cx = (i % cols) * c, cy = Math.floor(i / cols) * c;
+      for (let dy = 0; dy < c; dy++) for (let dx = 0; dx < c; dx++) { const o = ((cy + dy) * cv.width + cx + dx) * 4; img.data[o] = v[0]; img.data[o + 1] = v[1]; img.data[o + 2] = v[2]; img.data[o + 3] = 255; }
+    }
+    x.putImageData(img, 0, 0);
+    w.bits.forEach((b, i) => {
+      if (probe >= 0 && i > probe) return;
+      x.strokeStyle = bitAt(b) ? "#1e9a58" : "#d4373f"; x.lineWidth = 2.5;
+      x.beginPath(); x.arc((b % cols) * c + 1.5, Math.floor(b / cols) * c + 1.5, i === probe ? 9 : 6, 0, 7); x.stroke();
     });
-    if (calls.has(i)) svg += `<text x="${i * bw + bw / 2}" y="${H + 14}" text-anchor="middle" font-size="12" fill="var(--tp)">▲</text>`;
-    if (i === s8sel) svg += `<rect x="${i * bw}" y="0" width="${bw}" height="${H}" fill="none" stroke="var(--ink)" stroke-width="1.5"/>`;
-  });
-  svg += "</svg>";
+  },
+  zoom: b => {
+    let h = "";
+    for (let i = Math.max(0, b - 20); i < Math.min(D.bloom.m, b + 20); i++) h += `<span class="cell ${i === b ? "on" : ""}" title="bit ${i}" style="min-width:18px;padding:3px 2px">${bitAt(i)}</span>`;
+    $("zoomBits").innerHTML = h;
+  },
+  show: (upto) => {
+    const w = D.words[sel.word];
+    $("bt").innerHTML = `<tr><th>i</th><th>bit position</th><th>bit</th></tr>` + w.bits.map((b, i) => {
+      const hidden = upto >= 0 && i > upto, v = bitAt(b);
+      return `<tr ${i === upto ? 'class="on"' : ""}><td>${i}</td><td class="mono">${hidden ? "…" : fmt(b)}</td><td>${hidden ? "" : v ? '<span class="tag tp">1 ✓</span>' : '<span class="tag fn">0 ✗</span>'}</td></tr>`;
+    }).join("");
+    V[3].drawBits(upto);
+    const firstZero = w.bits.findIndex(b => !bitAt(b)), why = changedIn(w.pos);
+    if (upto < 0) {
+      V[3].zoom(w.bits[firstZero >= 0 ? firstZero : 0]);
+      $("b4res").innerHTML = w.bloom ? `all ${D.bloom.h} bits are 1 → <b>maybe in the reference</b>${w.ref_positions.length ? " (and stage 3 finds it)" : " (but stage 3 does not: a false alarm)"}` : `bit #${firstZero} is 0 → <b>definitely absent</b>${why.length ? " — this word contains the " + why.join(", ") : ""}`;
+      $("b4eq").innerHTML = `word <b>${w.word}</b>`;
+    }
+  },
+  check: async tok => {
+    const w = D.words[sel.word];
+    for (let i = 0; i < w.bits.length; i++) {
+      V[3].show(i); V[3].zoom(w.bits[i]);
+      const v = bitAt(w.bits[i]);
+      const msg = `i = ${i}: position h1 + ${i}·h2 mod ${fmt(D.bloom.m)} = <b>${fmt(w.bits[i])}</b> → bit is <b>${v}</b> ${v ? "✓ keep checking" : "✗ stop: definitely absent"}`;
+      $("b4eq").innerHTML = msg;
+      await wait(900, tok);
+      if (!v) { V[3].show(i); $("b4eq").innerHTML = msg; return; }
+    }
+    V[3].show(w.bits.length - 1);
+    $("b4eq").innerHTML = `all ${w.bits.length} bits are 1 → maybe in the reference → go to stage 3`;
+  },
+};
 
-  const i = s8sel, cnt = s8.counts[i], dep = s8.depth[i], ref = L.indexOf(s8.ref_letters[i]);
-  let alt = -1;
-  [0, 1, 2, 3].forEach(c => { if (c !== ref && (alt < 0 || cnt[c] > cnt[alt])) alt = c; });
-  const altN = alt >= 0 ? cnt[alt] : 0;
-  const okDepth = dep >= st.min_depth, okFrac = altN > 0 && altN * 100 >= st.min_alt_pct * dep;
-  const bars = [0, 1, 2, 3].map(c => `<div class="row"><span class="lbl">${L[c]}${c === ref ? " (ref)" : ""}</span>
-    <span style="display:inline-block;height:16px;width:${cnt[c] / Math.max(1, dep) * 260}px;background:var(--${L[c]});border-radius:2px"></span>&nbsp;${cnt[c]}</div>`).join("");
-  return `<div class="explain">
-    <p>After all reads are placed, every accepted read adds 1 to the counter of its letter at each position it covers. Depth (reads covering a position)
-    comes from a difference array: +1 at a read's start, −1 just past its end, then a running sum.</p>
-    <p><b>Mutation or sequencing error?</b> A mutation is in the sample genome, so almost every read covering that spot shows it. An error is random in
-    one read. Rule: call a mutation when depth ≥ <b>${st.min_depth}</b> and at least <b>${st.min_alt_pct}%</b> of the reads show the same non-reference letter.
-    Click any bar to inspect that position.</p></div>
-    <div class="card"><h3>Positions ${fmt(s8.span_start)}–${fmt(s8.span_start + n - 1)} (under read #${D.read.index})</h3>${svg}
-    <div class="legend"><span><i style="background:var(--line)"></i>reads matching the reference</span><span>${legendLetters} (other letters)</span><span style="color:var(--tp)">▲ mutation called</span></div></div>
-    <div class="card"><h3>Position ${fmt(s8.span_start + i)} (1-based ${fmt(s8.span_start + i + 1)}): reference ${s8.ref_letters[i]}</h3>${bars}
-    <p>Depth <b>${dep}</b> ${okDepth ? "≥" : "<"} ${st.min_depth} ${okDepth ? "✓" : "✗"} · most common other letter <b>${alt >= 0 && altN ? L[alt] : "none"}</b> with ${altN} read(s):
-    ${altN} × 100 = ${altN * 100} ${okFrac ? "≥" : "<"} ${st.min_alt_pct} × ${dep} = ${st.min_alt_pct * dep} ${okFrac ? "✓" : "✗"}</p>
-    <p>${okDepth && okFrac ? `<span class="tag ok">mutation called: ${s8.ref_letters[i]} → ${L[alt]}</span>` :
-      altN ? '<span class="tag mid">treated as sequencing error(s): no call</span>' : '<span class="tag info">all reads agree with the reference</span>'}</p></div>`;
-}
+/* ================= STAGE 5: vote BST ================= */
+V[4] = {
+  what: () => `Each found word votes for where the read starts: <b>start = reference position − read offset</b>. Votes go into a <b>binary search tree</b> keyed by start: smaller to the left, larger to the right, equal adds 1 to that node's count. Click a node to see which words voted for it; press the button to build the tree vote by vote.`,
+  html: () => {
+    const nodes = D.stage5.nodes;
+    return `${nodes === 1 ? `<p class="note"><b>Only one start?</b> That is normal here: with k = ${D.settings.k}, almost every ${D.settings.k}-letter word occurs once in this 29,903-letter genome, so all words agree. In this run only <b>${D.interesting.multi_candidate_total}</b> of ${fmt(D.summary.reads)} reads got 2+ candidate starts. Pick one under "reads with 2+ candidate starts", or try the <b>Small k</b> scenario.</p>` : ""}
+      <div class="box"><h3>Vote tree: ${nodes} node(s), height ${D.stage5.height}</h3><div id="tree"></div></div>
+      <div class="row-btns" style="margin-bottom:10px"><button class="btn solid" id="build">Animate building the tree</button><button class="btn" id="reset5">Show final tree</button><span class="hint" id="v5info"></span></div>
+      <div class="box"><h3>Votes (in the order stage 5 cast them)</h3><table id="votes"></table></div>`;
+  },
+  mount: () => { V[4].draw(D.stage5.tree, null); V[4].table(null); $("build").onclick = () => animate(V[4].build); $("reset5").onclick = () => { stopAnim(); V[4].draw(D.stage5.tree, null); V[4].table(null); }; },
+  table: (hl, upto = Infinity) => {
+    let h = `<tr><th>#</th><th>word (read offset)</th><th>reference position</th><th>start = position − offset</th></tr>`, k = 0;
+    D.words.forEach(w => w.votes.forEach((v, j) => { k++;
+      h += `<tr class="${hl === v ? "on" : ""}" style="${k > upto ? "opacity:.3" : ""}"><td>${k}</td><td class="mono">${w.word} (@${w.pos})</td><td class="mono">${fmt(w.ref_positions[j])}</td><td class="mono">${fmt(w.ref_positions[j])} − ${w.pos} = <b>${fmt(v)}</b></td></tr>`; }));
+    $("votes").innerHTML = k ? h : "<tr><td>no votes: every word was skipped or not found</td></tr>";
+  },
+  draw: (root, flash) => {
+    const nodes = [], edges = []; let order = 0;
+    (function walk(n, d, p) { if (!n) return; walk(n.left, d + 1, n); nodes.push({ n, x: order++, y: d }); if (p) edges.push([p, n]); walk(n.right, d + 1, n); })(root, 0, null);
+    if (!nodes.length) { $("tree").innerHTML = '<p class="hint">empty tree</p>'; return; }
+    const pos = new Map(nodes.map(o => [o.n, o])), dx = 100, dy = 70, W = Math.max(300, nodes.length * dx + 40), H = (Math.max(...nodes.map(o => o.y)) + 1) * dy + 10;
+    let s = `<svg width="${W}" height="${H}" font-family="IBM Plex Sans">`;
+    edges.forEach(([a, b]) => { const A = pos.get(a), B = pos.get(b); s += `<line x1="${50 + A.x * dx}" y1="${30 + A.y * dy}" x2="${50 + B.x * dx}" y2="${30 + B.y * dy}" stroke="#17191e"/><text x="${(100 + (A.x + B.x) * dx) / 2 + (B.x < A.x ? -10 : 10)}" y="${(60 + (A.y + B.y) * dy) / 2}" font-size="10" fill="#5d636f" text-anchor="middle">${B.x < A.x ? "smaller" : "larger"}</text>`; });
+    const best = Math.max(...nodes.map(o => o.n.count));
+    nodes.forEach(o => { const x = 50 + o.x * dx, y = 30 + o.y * dy, f = o.n.start === flash;
+      s += `<g style="cursor:pointer" data-s="${o.n.start}"><rect x="${x - 44}" y="${y - 22}" width="88" height="44" fill="${f ? "#ffd84a" : o.n.count === best ? "#17191e" : "#fff"}" stroke="#17191e"/>
+        <text x="${x}" y="${y - 3}" text-anchor="middle" font-weight="700" font-size="14" fill="${!f && o.n.count === best ? "#fff" : "#17191e"}">${fmt(o.n.start)}</text>
+        <text x="${x}" y="${y + 14}" text-anchor="middle" font-size="11" fill="${!f && o.n.count === best ? "#fff" : "#5d636f"}">count ${o.n.count}</text></g>`; });
+    $("tree").innerHTML = s + "</svg>";
+    document.querySelectorAll("#tree g[data-s]").forEach(g => g.onclick = () => { const v = +g.dataset.s; V[4].table(v); $("v5info").textContent = `start ${fmt(v)}: highlighted rows below are its votes`; });
+  },
+  build: async tok => {
+    let root = null, k = 0;
+    const total = D.words.reduce((a, w) => a + w.votes.length, 0);
+    for (const w of D.words) for (const v of w.votes) {
+      k++;
+      if (!root) root = { start: v, count: 1, left: null, right: null };
+      else { let c = root; for (;;) { if (v === c.start) { c.count++; break; } const side = v < c.start ? "left" : "right"; if (!c[side]) { c[side] = { start: v, count: 1, left: null, right: null }; break; } c = c[side]; } }
+      V[4].draw(root, v); V[4].table(v, k); $("v5info").textContent = `vote ${k} of ${total}: start ${fmt(v)}`;
+      await wait(450, tok);
+    }
+    V[4].draw(root, null);
+  },
+};
 
-/* Selects a stage 8 position and redraws. */
-function pick8(i) { s8sel = i; draw(); }
+/* ================= STAGE 6: heap ================= */
+V[5] = {
+  heap: [], logLines: [],
+  what: () => `The vote tree is walked in order and every (start, votes) pair is offered to a <b>min-heap that holds at most 3</b>, stored as an array: index 0 is the root, children of i are 2i+1 and 2i+2. The root is the <b>weakest</b> kept candidate (fewer votes; on a tie, larger start). While there is room, a newcomer is added at the end and <b>sifted up</b>; once full, it must beat the root to replace it, then it is <b>sifted down</b>. Try your own offers too.`,
+  html: () => `${D.stage6.offers.length < 2 ? `<p class="note">This read offers only ${D.stage6.offers.length} candidate, so its heap is trivial. Pick a read with 2+ candidate starts, or use "Offer your own" below to see the heap work.</p>` : ""}
+    <div class="box"><div class="heapwrap"><div><h3>Heap as an array</h3><div class="harr" id="harr"></div></div><div><h3>Same heap as a tree</h3><div id="htree"></div></div></div></div>
+    <div class="row-btns" style="margin-bottom:10px"><button class="btn solid" id="form">Animate this read's heap formation</button><button class="btn" id="clear6">Empty the heap</button>
+      <span style="width:16px"></span><b style="font-size:13px">Offer your own:</b> start <input id="os" type="number" value="500" style="width:80px"> votes <input id="ov" type="number" value="4" min="1" style="width:60px"><button class="btn" id="offer">Offer</button></div>
+    <div class="cols"><div class="box sub"><h3>What happened</h3><div class="log" id="hlog"></div></div><div class="box"><h3>Short-list handed to stage 7 (best first)</h3><div id="short" class="cells"></div></div></div>`,
+  mount: () => {
+    V[5].heap = D.stage6.offers.length ? D.stage6.offers[D.stage6.offers.length - 1].heap.map(([s, v]) => ({ s, v })) : [];
+    V[5].logLines = ["showing this read's final heap"]; V[5].render([]);
+    $("form").onclick = () => animate(V[5].form);
+    $("clear6").onclick = () => { stopAnim(); V[5].heap = []; V[5].logLines = ["heap emptied"]; V[5].render([]); };
+    $("offer").onclick = () => animate(tok => V[5].offer({ s: +$("os").value, v: Math.max(1, +$("ov").value) }, tok));
+  },
+  worse: (a, b) => a.v !== b.v ? a.v < b.v : a.s > b.s,
+  render: hot => {
+    const h = V[5].heap;
+    $("harr").innerHTML = [0, 1, 2].map(i => `<div class="${hot.includes(i) ? "hot" : ""}"><small>[${i}]${i === 0 ? " root (weakest)" : ""}</small>${h[i] ? `start ${fmt(h[i].s)}<br>${h[i].v} vote(s)` : "empty"}</div>`).join("");
+    const P = [[130, 26], [60, 96], [200, 96]];
+    let s = `<svg width="260" height="124" font-family="IBM Plex Sans">`;
+    if (h[1]) s += `<line x1="130" y1="26" x2="60" y2="96" stroke="#17191e"/>`; if (h[2]) s += `<line x1="130" y1="26" x2="200" y2="96" stroke="#17191e"/>`;
+    h.forEach((c, i) => { const [x, y] = P[i]; s += `<rect x="${x - 50}" y="${y - 20}" width="100" height="40" fill="${hot.includes(i) ? "#ffd84a" : "#fff"}" stroke="#17191e"/><text x="${x}" y="${y - 3}" text-anchor="middle" font-size="13" font-weight="700">${fmt(c.s)}</text><text x="${x}" y="${y + 13}" text-anchor="middle" font-size="11" fill="#5d636f">[${i}] ${c.v} votes</text>`; });
+    $("htree").innerHTML = s + "</svg>";
+    $("hlog").innerHTML = V[5].logLines.map(l => `<div>${l}</div>`).join(""); $("hlog").scrollTop = 1e9;
+    const sorted = h.slice().sort((a, b) => V[5].worse(a, b) ? 1 : V[5].worse(b, a) ? -1 : 0);
+    $("short").innerHTML = sorted.map((c, i) => `<span class="cell">${i + 1}. start ${fmt(c.s)} · ${c.v} votes</span>`).join("") || '<span class="hint">empty</span>';
+  },
+  offer: async (c, tok) => {
+    const h = V[5].heap, say = t => { V[5].logLines.push(t); };
+    say(`offer start ${fmt(c.s)} with ${c.v} vote(s)`);
+    if (h.length < 3) {
+      h.push(c); let i = h.length - 1; say(`  room left → put at [${i}]`); V[5].render([i]); await wait(700, tok);
+      while (i > 0) { const p = (i - 1) >> 1;
+        if (!V[5].worse(h[i], h[p])) { say(`  [${i}] is not weaker than parent [${p}] → stop`); break; }
+        say(`  [${i}] is weaker than parent [${p}] → swap (sift up)`); [h[i], h[p]] = [h[p], h[i]]; V[5].render([i, p]); await wait(800, tok); i = p; }
+    } else if (V[5].worse(h[0], c)) {
+      say(`  full, and it beats the root (${fmt(h[0].s)}, ${h[0].v}) → replace [0]`); h[0] = c; V[5].render([0]); await wait(800, tok);
+      let i = 0;
+      for (;;) { const l = 2 * i + 1, r = l + 1; let m = i;
+        if (l < h.length && V[5].worse(h[l], h[m])) m = l; if (r < h.length && V[5].worse(h[r], h[m])) m = r;
+        if (m === i) { say(`  no child is weaker → stop`); break; }
+        say(`  child [${m}] is weaker → swap [${i}] and [${m}] (sift down)`); [h[i], h[m]] = [h[m], h[i]]; V[5].render([i, m]); await wait(800, tok); i = m; }
+    } else say(`  full, and it does not beat the root (${fmt(h[0].s)}, ${h[0].v}) → discard`);
+    V[5].render([]);
+  },
+  form: async tok => {
+    V[5].heap = []; V[5].logLines = ["this read's in-order walk:"]; V[5].render([]);
+    for (const o of D.stage6.offers) await V[5].offer({ s: o.start, v: o.votes }, tok);
+    V[5].logLines.push("done: this matches the C program's heap"); V[5].render([]);
+  },
+};
 
-/* Stage 9: genome-wide picture of the key and the calls, then the score. */
-function stage9() {
-  const s9 = D.stage9, s = D.summary, len = s.ref_len, W = 1000, H = 120;
-  const called = new Map(s9.calls.map(c => [c.pos, c]));
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px">`;
-  const maxD = Math.max(1, ...s9.depth_sample);
-  let path = "";
-  s9.depth_sample.forEach((d, i) => { path += `${i ? "L" : "M"}${(i * 100 / len * W).toFixed(1)},${(80 - d / maxD * 50).toFixed(1)}`; });
-  svg += `<path d="${path}" fill="none" stroke="var(--muted)" stroke-width="1"/><text x="0" y="22" font-size="11" fill="var(--muted)">read depth (max ${maxD})</text>`;
-  svg += `<rect x="0" y="88" width="${W}" height="10" rx="3" fill="var(--line)"/>`;
-  s9.key.forEach(k => {
-    const c = called.get(k.pos), ok = c && c.tp;
-    svg += `<line x1="${k.pos / len * W}" y1="84" x2="${k.pos / len * W}" y2="102" stroke="var(${ok ? "--tp" : "--fn"})" stroke-width="3"><title>${k.pos + 1}: ${k.ref}→${k.alt}, depth ${k.depth} ${ok ? "found" : "missed"}</title></line>`;
-  });
-  s9.calls.filter(c => !c.tp).forEach(c => { svg += `<line x1="${c.pos / len * W}" y1="84" x2="${c.pos / len * W}" y2="102" stroke="var(--fp)" stroke-width="3"/>`; });
-  svg += `<text x="0" y="116" font-size="11" fill="var(--muted)">1</text><text x="${W}" y="116" font-size="11" text-anchor="end" fill="var(--muted)">${fmt(len)}</text></svg>`;
-  const rows = s9.key.map(k => {
-    const c = called.get(k.pos), ok = c && c.tp;
-    return `<tr><td>${fmt(k.pos + 1)}</td><td class="mono">${k.ref} → ${k.alt}</td><td>${k.depth}</td><td>${c ? `${c.alt_count} / ${c.depth}` : "–"}</td><td>${ok ? '<span class="tag ok">TP</span>' : '<span class="tag no">FN</span>'}</td></tr>`;
-  }).join("") + s9.calls.filter(c => !c.tp).map(c => `<tr><td>${fmt(c.pos + 1)}</td><td class="mono">${c.ref} → ${c.alt}</td><td>${c.depth}</td><td>${c.alt_count} / ${c.depth}</td><td><span class="tag mid">FP</span></td></tr>`).join("");
-  return `<div class="explain">
-    <p>The planted answer key is sorted by position. For each call, a <b>binary search</b> finds that position in the key (about ${Math.ceil(Math.log2(s9.key.length + 1))}
-    steps for ${s9.key.length} entries). A call is a <b>true positive</b> only if the position and the new letter both match.</p>
-    <p>Recall is shown two ways: against every planted mutation, and against <b>callable</b> ones (at least ${D.settings.min_depth} reads covering them).
-    A mutation no read covers is not the pipeline's fault.</p></div>
-    <div class="stats">
-      <div class="stat"><span>True positives</span><div class="big" style="color:var(--tp)">${s.tp}</div></div>
-      <div class="stat"><span>False positives</span><div class="big" style="color:var(--fp)">${s.fp}</div></div>
-      <div class="stat"><span>Missed (FN)</span><div class="big" style="color:var(--fn)">${s.fn}</div></div>
-      <div class="stat"><span>Precision</span><div class="big">${s.precision}%</div></div>
-      <div class="stat"><span>Recall (all / callable)</span><div class="big">${s.recall_all}% / ${s.recall_callable}%</div></div>
-      <div class="stat"><span>Reads placed / wrong start</span><div class="big">${fmt(s.placed)} / ${s.misplaced}</div></div>
-    </div>
-    <div class="card"><h3>Whole genome</h3>${svg}<div class="legend"><span><i style="background:var(--tp)"></i>planted, found</span><span><i style="background:var(--fn)"></i>planted, missed</span><span><i style="background:var(--fp)"></i>false call</span></div></div>
-    <div class="card"><h3>Answer key vs calls (1-based positions)</h3><table><tr><th>position</th><th>change</th><th>depth</th><th>reads with alt</th><th>result</th></tr>${rows}</table></div>`;
-}
+/* ================= STAGE 7: verify ================= */
+V[6] = {
+  cand: 0, row0: 0, pick: null,
+  what: () => `Votes only say some words matched. Verify compares <b>every letter</b> of the read with the reference starting at each candidate and finds the fewest edits (substitutions, insertions, deletions) that turn one into the other: the <b>edit distance</b>. It fills a table where cell (i, j) = fewest edits between the first <i>i</i> read letters and the first <i>j</i> reference letters. Only cells within ±${D.settings.band} of the diagonal are computed (the band). Accepted if the bottom-right cell is ≤ ${D.settings.max_edit}. Click any cell to see how it was computed.`,
+  html: () => {
+    const cs = D.stage7.candidates;
+    if (!cs.length) return `<div class="box">No candidates, so there is nothing to verify: this read is not placed.</div>`;
+    if (V[6].cand >= cs.length) V[6].cand = 0;
+    const c = cs[V[6].cand];
+    return `<div class="row-btns" style="margin-bottom:10px">${cs.map((x, i) => `<button class="btn ${i === V[6].cand ? "solid" : ""}" data-c="${i}">candidate ${i + 1}: start ${fmt(x.start)} · distance ${x.distance ?? "∞"} · ${x.accepted ? "accepted" : "rejected"}</button>`).join("")}</div>
+      <div class="box"><h3>Letter by letter (mismatches in full colour)</h3><div id="aln"></div></div>
+      ${c.dp ? `<div class="cols"><div class="box"><h3>Table rows <span id="rr"></span> (drag to move)</h3><input type="range" id="rowSl" min="0" max="${Math.max(0, c.dp.length - 13)}" value="0"><div style="overflow-x:auto"><table class="dpt" id="dpt"></table></div>
+        <div class="row-btns" style="margin-top:8px"><button class="btn" id="fill">Animate filling these rows</button><button class="btn" id="toMis">Jump to first mismatch</button></div></div>
+        <div class="box sub"><h3>How the clicked cell was computed</h3><div id="why" class="eq">click a number in the table</div>
+        <h3 style="margin-top:12px">Whole band (each dot = one cell; click to jump)</h3><canvas class="cv" id="band" style="cursor:pointer"></canvas>
+        <p class="hint">Bottom-right cell = <b>${c.distance}</b> edits → ${c.accepted ? "accepted" : "rejected"} (limit ${D.settings.max_edit}).</p></div></div>` : `<div class="box">Status: ${c.status}; no table.</div>`}`;
+  },
+  mount: () => {
+    document.querySelectorAll("[data-c]").forEach(b => b.onclick = () => { V[6].cand = +b.dataset.c; V[6].row0 = 0; V[6].pick = null; openStage(6); });
+    const c = D.stage7.candidates[V[6].cand]; if (!c) return;
+    const r = D.read.letters, w = c.window || "";
+    let h = "";
+    for (let a = 0; a < r.length; a += 50) {
+      h += `<div class="lane"><span class="lbl">read ${a}</span>${r.slice(a, a + 50).split("").map((ch, k) => tile(ch, ch === w[a + k] ? "same" : "sel")).join("")}</div>`;
+      h += `<div class="lane" style="margin-bottom:8px"><span class="lbl">ref ${fmt(c.start + a)}</span>${w.slice(a, a + 50).split("").map((ch, k) => tile(ch, ch === r[a + k] ? "same" : "sel")).join("")}</div>`;
+    }
+    $("aln").innerHTML = h;
+    if (!c.dp) return;
+    const mis = [...r].findIndex((ch, i) => ch !== w[i]);
+    $("rowSl").oninput = e => { stopAnim(); V[6].row0 = +e.target.value; V[6].table(); };
+    $("fill").onclick = () => animate(V[6].fill);
+    $("toMis").onclick = () => { V[6].row0 = Math.max(0, Math.min(c.dp.length - 13, mis - 4)); $("rowSl").value = V[6].row0; V[6].table(); };
+    V[6].band(); V[6].table();
+    $("band").onclick = e => { const rr = $("band").getBoundingClientRect(); V[6].row0 = Math.max(0, Math.min(c.dp.length - 13, Math.floor((e.clientY - rr.top) / 3) - 6)); $("rowSl").value = V[6].row0; V[6].table(); };
+  },
+  get: (c, i, j) => { const d = j - i + D.settings.band; return d >= 0 && d < c.dp[0].length && i < c.dp.length ? c.dp[i][d] : null; },
+  table: (filled = Infinity) => {
+    const c = D.stage7.candidates[V[6].cand], r = D.read.letters, w = c.window, i0 = V[6].row0, band = D.settings.band, rows = 13;
+    const j0 = Math.max(0, i0 - band), j1 = Math.min(w.length, i0 + rows - 1 + band);
+    $("rr").textContent = `${i0}–${Math.min(c.dp.length - 1, i0 + rows - 1)}`;
+    let h = `<tr><td class="hdr"></td><td class="hdr"></td>`;
+    for (let j = j0; j <= j1; j++) h += `<td class="hdr">${j === 0 ? "" : tile(w[j - 1])}</td>`;
+    h += "</tr>";
+    for (let i = i0; i < Math.min(c.dp.length, i0 + rows); i++) {
+      h += `<tr><td class="hdr">${i === 0 ? "" : tile(r[i - 1])}</td><td class="hdr mono" style="font-size:10px;color:#5d636f">${i}</td>`;
+      for (let j = j0; j <= j1; j++) {
+        const v = V[6].get(c, i, j), inb = Math.abs(i - j) <= band;
+        const p = V[6].pick, isPick = p && p[0] === i && p[1] === j, isSrc = p && ((p[0] - 1 === i && p[1] - 1 === j) || (p[0] - 1 === i && p[1] === j) || (p[0] === i && p[1] - 1 === j));
+        const show = i - i0 < filled;
+        h += !inb ? `<td class="out"></td>` : `<td class="${i === j ? "diag" : ""} ${isPick ? "pick" : isSrc ? "src" : ""}" data-ij="${i},${j}">${show ? (v ?? "∞") : ""}</td>`;
+      }
+      h += "</tr>";
+    }
+    $("dpt").innerHTML = h;
+    document.querySelectorAll("#dpt td[data-ij]").forEach(td => td.onclick = () => { V[6].pick = td.dataset.ij.split(",").map(Number); V[6].explain(); V[6].table(); });
+  },
+  explain: () => {
+    const c = D.stage7.candidates[V[6].cand], [i, j] = V[6].pick, r = D.read.letters, w = c.window, g = (a, b) => V[6].get(c, a, b);
+    const v = g(i, j);
+    if (i === 0 || j === 0) { $("why").innerHTML = `cell (${i}, ${j}) is on the edge: turning ${i} letters into ${j} letters takes ${Math.max(i, j)} edits → <b>${v}</b>`; return; }
+    const same = r[i - 1] === w[j - 1], d = g(i - 1, j - 1), u = g(i - 1, j), l = g(i, j - 1), f = x => x === null ? "∞" : x;
+    $("why").innerHTML = `cell (${i}, ${j}): read letter ${i} is <b>${r[i - 1]}</b>, reference letter ${j} is <b>${w[j - 1]}</b> → ${same ? "same, cost 0" : "different, cost 1"}<br>
+      diagonal (${i - 1},${j - 1}) + ${same ? 0 : 1} = ${d === null ? "∞" : d + (same ? 0 : 1)} &nbsp; (match / substitute)<br>
+      above (${i - 1},${j}) + 1 = ${u === null ? "∞" : u + 1} &nbsp; (read has an extra letter)<br>
+      left (${i},${j - 1}) + 1 = ${l === null ? "∞" : l + 1} &nbsp; (read is missing a letter)<br>
+      smallest = <b>${f(v)}</b>`;
+  },
+  band: () => {
+    const c = D.stage7.candidates[V[6].cand], n = c.dp.length, band = D.settings.band, cv = $("band"), s = 3;
+    cv.width = (c.window.length + 1) * s; cv.height = n * s;
+    const x = cv.getContext("2d"); x.fillStyle = "#f1f0eb"; x.fillRect(0, 0, cv.width, cv.height);
+    for (let i = 0; i < n; i++) c.dp[i].forEach((v, d) => { const j = i - band + d; if (v === null || j < 0) return;
+      x.fillStyle = v === 0 ? "#d8d6ce" : v <= D.settings.max_edit ? "#8c8a83" : "#d4373f"; x.fillRect(j * s, i * s, s, s); });
+    x.fillStyle = "#ffd84a"; x.fillRect((n - 1) * s - 2, (n - 1) * s - 2, s + 4, s + 4);
+  },
+  fill: async tok => { for (let f = 0; f <= 13; f++) { V[6].table(f); await wait(350, tok); } },
+};
 
-$("prev").onclick = () => go(stage - 1);
-$("next").onclick = () => go(stage + 1);
-$("readSel").onchange = e => load(+e.target.value);
-document.addEventListener("keydown", e => {
-  if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
-  if (e.key === "ArrowRight") go(stage + 1);
-  if (e.key === "ArrowLeft") go(stage - 1);
-});
-drawSettings();
-load(-1);
+/* ================= STAGE 8: pile-up ================= */
+V[7] = {
+  sel: 0,
+  what: () => `This stage uses <b>all placed reads</b>, not just one. For every placed read, the counter of its letter goes up at each position it covers (<b>counting array</b>: 4 counters per position). Depth comes from a <b>difference array</b>: +1 where a read starts, −1 just after it ends; a running sum gives the depth. A mutation is called where depth ≥ ${D.settings.min_depth} and ≥ ${D.settings.min_alt_pct}% of reads show the same new letter. The picture shows the ${D.stage8.depth.length} positions under the chosen read; the list below has every call in the genome.`,
+  html: () => `<div class="box"><h3>Reads stacked on positions ${fmt(D.stage8.span_start + 1)}–${fmt(D.stage8.span_start + D.stage8.depth.length)} · click a column</h3><canvas class="cv" id="pile" style="cursor:pointer"></canvas>
+    <div class="row-btns" style="margin-top:8px"><button class="btn" id="drop">Animate reads being added</button><span class="hint">grey = matches the reference, colour = a different letter</span></div></div>
+    <div class="cols"><div class="box"><h3>Counting array + difference array around the clicked column</h3><div id="arr8"></div></div><div class="box sub"><h3>Call decision</h3><div id="dec"></div></div></div>
+    <div class="box"><h3>All ${D.stage9.calls.length} calls in the genome · "open" loads a read over it so this stage shows that stretch</h3><div class="scroll" style="max-height:220px" id="allCalls"></div></div>`,
+  mount: () => {
+    const s8 = D.stage8, ends = [];
+    V[7].order = s8.reads.slice().sort((a, b) => a.start - b.start).map(rd => { let l = ends.findIndex(e => e < rd.start); if (l < 0) { l = ends.length; ends.push(0); } ends[l] = rd.start + rd.letters.length; return { rd, lane: l }; });
+    V[7].lanes = ends.length;
+    V[7].sel = s8.calls.length ? s8.calls[0] : (D.read.mutations[0] ?? 0);
+    $("pile").onclick = e => { const r = $("pile").getBoundingClientRect(); V[7].sel = Math.max(0, Math.min(s8.depth.length - 1, Math.floor((e.clientX - r.left) / 7))); V[7].draw(V[7].order.length); V[7].side(); };
+    $("drop").onclick = () => animate(async tok => { for (let r = 0; r <= V[7].order.length; r++) { V[7].draw(r); await wait(70, tok); } });
+    V[7].draw(V[7].order.length); V[7].side();
+    const keyByPos = new Map(D.stage9.key.map(k => [k.pos, k]));
+    $("allCalls").innerHTML = `<table><tr><th>position</th><th>change</th><th>reads with new letter / depth</th><th>result</th><th></th></tr>${D.stage9.calls.map(c => { const k = keyByPos.get(c.pos);
+      return `<tr><td class="mono">${fmt(c.pos + 1)}</td><td class="mono">${c.ref} → ${c.alt}</td><td>${c.alt_count} / ${c.depth}</td><td>${c.tp ? '<span class="tag tp">correct</span>' : '<span class="tag fp">false</span>'}</td><td>${k && k.read >= 0 ? `<button class="btn" data-read="${k.read}">open</button>` : ""}</td></tr>`; }).join("")}</table>`;
+    document.querySelectorAll("#allCalls [data-read]").forEach(b => b.onclick = () => run(+b.dataset.read));
+  },
+  draw: nReads => {
+    const s8 = D.stage8, n = s8.depth.length, cw = 7, rh = 6, top = 22, hist = 60, cv = $("pile");
+    cv.width = n * cw; cv.height = top + V[7].lanes * rh + hist + 26;
+    const x = cv.getContext("2d"); x.fillStyle = "#fff"; x.fillRect(0, 0, cv.width, cv.height);
+    for (let i = 0; i < n; i++) { x.fillStyle = COL[s8.ref_letters[i]]; x.fillRect(i * cw, 4, cw - 1, 12); }
+    const cnt = Array.from({ length: n }, () => [0, 0, 0, 0]);
+    for (let r = 0; r < nReads; r++) { const { rd, lane } = V[7].order[r], y = top + lane * rh;
+      for (let k = 0; k < rd.letters.length; k++) { const i = rd.start + k - s8.span_start; if (i < 0 || i >= n) continue;
+        const ch = rd.letters[k]; cnt[i][L.indexOf(ch)]++; x.fillStyle = ch === s8.ref_letters[i] ? "#d8d6ce" : COL[ch]; x.fillRect(i * cw, y, cw, rh - 1); } }
+    const hy = top + V[7].lanes * rh + 6, maxD = Math.max(1, ...s8.depth);
+    for (let i = 0; i < n; i++) { let y = hy + hist;
+      [0, 1, 2, 3].forEach(c => { const h = cnt[i][c] / maxD * hist; if (!h) return; x.fillStyle = L[c] === s8.ref_letters[i] ? "#b9b7af" : COL[L[c]]; x.fillRect(i * cw, y - h, cw - 1, h); y -= h; });
+      if (nReads === V[7].order.length && s8.calls.includes(i)) { x.fillStyle = "#17191e"; x.font = "600 11px 'IBM Plex Sans'"; x.fillText("call", i * cw - 6, hy + hist + 16); } }
+    x.strokeStyle = "#17191e"; x.lineWidth = 2; x.strokeRect(V[7].sel * cw - 1, 1, cw + 2, cv.height - 4);
+  },
+  side: () => {
+    const s8 = D.stage8, st = D.settings, i = V[7].sel, n = s8.depth.length;
+    let h = `<table><tr><th>pos</th><th>ref</th><th>A</th><th>C</th><th>G</th><th>T</th><th>diff</th><th>depth (running sum)</th></tr>`;
+    let run0 = s8.depth_before;
+    for (let p = 0; p < n; p++) { run0 += s8.diff[p];
+      if (Math.abs(p - i) > 5) continue;
+      const c = s8.counts[p];
+      h += `<tr class="${p === i ? "on" : ""}"><td class="mono">${fmt(s8.span_start + p + 1)}</td><td>${s8.ref_letters[p]}</td>${c.map(v => `<td class="mono">${v}</td>`).join("")}<td class="mono">${s8.diff[p] > 0 ? "+" : ""}${s8.diff[p]}</td><td class="mono">${run0}</td></tr>`; }
+    $("arr8").innerHTML = h + `</table><p class="hint">diff = reads starting here minus reads that ended just before here. Running sum of diff = depth (${s8.depth[i]} at the selected column).</p>`;
+    const cnt = s8.counts[i], dep = s8.depth[i], ref = L.indexOf(s8.ref_letters[i]);
+    let alt = -1; [0, 1, 2, 3].forEach(c => { if (c !== ref && (alt < 0 || cnt[c] > cnt[alt])) alt = c; });
+    const an = alt >= 0 ? cnt[alt] : 0, okD = dep >= st.min_depth, okF = an > 0 && an * 100 >= st.min_alt_pct * dep;
+    $("dec").innerHTML = `<p>position <b>${fmt(s8.span_start + i + 1)}</b>, reference <b>${L[ref]}</b></p>
+      <p>1. depth ${dep} ${okD ? "≥" : "<"} ${st.min_depth} → ${okD ? "✓" : "✗ too few reads"}</p>
+      <p>2. most common other letter: <b>${an ? L[alt] : "none"}</b> in ${an} read(s): ${an} × 100 = ${an * 100} ${okF ? "≥" : "<"} ${st.min_alt_pct} × ${dep} = ${st.min_alt_pct * dep} → ${okF ? "✓" : "✗"}</p>
+      <p><b>${okD && okF ? `→ mutation called: ${L[ref]} → ${L[alt]}` : an ? "→ no call: treated as sequencing error(s)" : "→ no call: every read agrees with the reference"}</b></p>`;
+  },
+};
+
+/* ================= STAGE 9: score ================= */
+V[8] = {
+  what: () => `The planted answer key is a <b>sorted array</b> of positions. For each call, <b>binary search</b> looks for its position: compare with the middle, discard the half that cannot contain it, repeat (at most ${Math.ceil(Math.log2(D.stage9.key.length + 1))} steps for ${D.stage9.key.length} entries). A call is correct only if the position <b>and</b> the new letter match. Click a call, then animate its search.`,
+  html: () => `<div class="box"><h3>Answer key as a sorted array (1-based positions)</h3><div class="bsearch" id="bs"></div><div class="eq" id="bseq">pick a call below</div>
+    <div class="row-btns"><button class="btn solid" id="bsgo">Animate the binary search</button></div></div>
+    <div class="box"><h3>Calls to grade</h3><div class="scroll" style="max-height:240px"><table id="calls9"></table></div></div>
+    <div class="box sub"><b>${D.summary.tp}</b> correct · <b>${D.summary.fp}</b> false · <b>${D.summary.fn}</b> missed → precision ${D.summary.precision}%, recall ${D.summary.recall_all}% of all planted, ${D.summary.recall_callable}% of the ${D.summary.callable} with depth ≥ ${D.settings.min_depth}</div>`,
+  cur: 0,
+  mount: () => {
+    const cs = D.stage9.calls;
+    $("calls9").innerHTML = `<tr><th>call</th><th>position</th><th>change</th><th>result</th></tr>` + cs.map((c, i) => `<tr class="click ${i === V[8].cur ? "on" : ""}" data-i="${i}"><td>${i + 1}</td><td class="mono">${fmt(c.pos + 1)}</td><td class="mono">${c.ref} → ${c.alt}</td><td>${c.tp ? '<span class="tag tp">correct</span>' : '<span class="tag fp">false</span>'}</td></tr>`).join("");
+    document.querySelectorAll("#calls9 tr[data-i]").forEach(tr => tr.onclick = () => { stopAnim(); V[8].cur = +tr.dataset.i; document.querySelectorAll("#calls9 tr[data-i]").forEach(t => t.classList.toggle("on", t === tr)); V[8].paint(null); });
+    $("bsgo").onclick = () => animate(V[8].search);
+    if (V[8].cur >= cs.length) V[8].cur = 0;
+    V[8].paint(null);
+  },
+  paint: st => {
+    const key = D.stage9.key;
+    $("bs").innerHTML = key.map((k, i) => { let c = ""; if (st) c = i === st.mid ? "mid" : i >= st.lo && i < st.hi ? "rng" : "out";
+      return `<div class="${c}"><small style="color:#5d636f">[${i}]</small><br>${fmt(k.pos + 1)}</div>`; }).join("");
+    const c = D.stage9.calls[V[8].cur];
+    if (!st && c) $("bseq").innerHTML = `looking for call position <b>${fmt(c.pos + 1)}</b> (${c.ref} → ${c.alt})`;
+  },
+  search: async tok => {
+    const key = D.stage9.key, c = D.stage9.calls[V[8].cur]; if (!c) return;
+    let lo = 0, hi = key.length, step = 0;
+    while (lo < hi) {
+      const mid = lo + ((hi - lo) >> 1); step++;
+      V[8].paint({ lo, hi, mid });
+      const v = key[mid].pos;
+      if (v === c.pos) { const ok = key[mid].alt === c.alt;
+        $("bseq").innerHTML = `step ${step}: middle [${mid}] = ${fmt(v + 1)} = ${fmt(c.pos + 1)} → found. Planted ${key[mid].ref} → ${key[mid].alt}, called ${c.ref} → ${c.alt} → <b>${ok ? "correct (TP)" : "wrong letter (FP)"}</b>`; return; }
+      $("bseq").innerHTML = `step ${step}: range [${lo}, ${hi}), middle [${mid}] = ${fmt(v + 1)} ${v < c.pos ? "<" : ">"} ${fmt(c.pos + 1)} → keep the ${v < c.pos ? "right" : "left"} half`;
+      await wait(1100, tok);
+      if (v < c.pos) lo = mid + 1; else hi = mid;
+    }
+    V[8].paint({ lo, hi: lo, mid: -1 });
+    $("bseq").innerHTML = `range is empty after ${step} step(s) → position ${fmt(c.pos + 1)} is not in the key → <b>false call (FP)</b>`;
+  },
+};
+
+run(-1);
 </script>
 </body>
 </html>

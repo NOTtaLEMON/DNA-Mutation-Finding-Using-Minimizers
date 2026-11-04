@@ -4,7 +4,7 @@ Local server for the step-by-step visualizer.
 Run from anywhere:   python web/server.py      then open http://localhost:8000
 
 GET /                  serves web/index.html
-GET /api/trace?read=N&mutations=..&coverage=..&error_rate=..&seed=..&min_depth=..&max_edit=..
+GET /api/trace?read=N&mutations=..&coverage=..&error_rate=..&seed=..&min_depth=..&max_edit=..&k=..&w=..
                        runs the C trace program for read N (-1 = auto pick) with
                        those settings (each optional, range-checked) and returns its JSON
 
@@ -36,6 +36,8 @@ SETTINGS = [
     ("seed", int, 42, 0, 1_000_000_000),
     ("min_depth", int, 3, 1, 50),
     ("max_edit", int, 3, 0, 10),
+    ("k", int, 15, 8, 32),
+    ("w", int, 10, 1, 40),
 ]
 
 SOURCES = ["stage1_load/seq.c", "stage2_minimizers/minimizer.c", "stage3_index/index.c",
